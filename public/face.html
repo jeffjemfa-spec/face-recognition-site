@@ -243,6 +243,56 @@
       margin-top: 12px;
     }
 
+    .gallery-title {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .photo-strip {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 86px;
+      gap: 8px;
+      margin-top: 8px;
+      padding-bottom: 4px;
+      overflow-x: auto;
+      overscroll-behavior-inline: contain;
+      scroll-snap-type: inline mandatory;
+    }
+
+    .thumb {
+      appearance: none;
+      min-width: 0;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #f8fafb;
+      color: var(--ink);
+      text-align: left;
+      scroll-snap-align: start;
+    }
+
+    .thumb img {
+      display: block;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      background: #dce2e8;
+    }
+
+    .thumb-label {
+      padding: 5px 6px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     @media (min-width: 680px) {
       .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
@@ -275,6 +325,8 @@
       </div>
       <div id="modalTitle" class="modal-title"></div>
       <div id="modalChips" class="chips modal-chips"></div>
+      <div class="gallery-title">相關照片</div>
+      <div id="modalGallery" class="photo-strip"></div>
     </div>
   </dialog>
 
@@ -293,6 +345,7 @@
     const modalId = document.getElementById("modalId");
     const modalTitle = document.getElementById("modalTitle");
     const modalChips = document.getElementById("modalChips");
+    const modalGallery = document.getElementById("modalGallery");
 
     club.innerHTML = '<option value="">全部社團</option>' + clubs.map((item) => (
       '<option value="' + item + '">' + item + '</option>'
@@ -300,6 +353,30 @@
 
     function chipHtml(items) {
       return items.map((item) => '<span class="chip">' + item + '</span>').join("");
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      })[char]);
+    }
+
+    function galleryItems(person) {
+      const related = people.filter((item) => (
+        item.id !== person.id && item.clubs.some((clubName) => person.clubs.includes(clubName))
+      )).slice(0, 5);
+      return [
+        { label: "主照", src: person.imageData, alt: person.name },
+        ...related.map((item) => ({
+          label: "同社團 " + item.name,
+          src: item.imageData,
+          alt: item.name
+        }))
+      ];
     }
 
     function matches(person) {
@@ -316,6 +393,12 @@
       modalId.textContent = person.id;
       modalTitle.textContent = person.title;
       modalChips.innerHTML = chipHtml(person.clubs);
+      modalGallery.innerHTML = galleryItems(person).map((item) => (
+        '<button class="thumb" type="button" data-src="' + escapeHtml(item.src) + '" data-alt="' + escapeHtml(item.alt) + '">' +
+          '<img src="' + item.src + '" alt="' + escapeHtml(item.alt) + '" loading="lazy">' +
+          '<div class="thumb-label">' + escapeHtml(item.label) + '</div>' +
+        '</button>'
+      )).join("");
       dialog.showModal();
     }
 
@@ -343,6 +426,12 @@
     });
 
     document.getElementById("close").addEventListener("click", () => dialog.close());
+    modalGallery.addEventListener("click", (event) => {
+      const thumb = event.target.closest(".thumb");
+      if (!thumb) return;
+      modalPhoto.src = thumb.dataset.src;
+      modalPhoto.alt = thumb.dataset.alt;
+    });
     search.addEventListener("input", render);
     club.addEventListener("change", render);
     render();
