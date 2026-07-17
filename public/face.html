@@ -16,7 +16,7 @@
       --accent-2: #b9462f;
       --chip: #e7f3f1;
       --shadow: 0 12px 34px rgba(21, 31, 43, .14);
-      --card-photo-height: 96px;
+      --card-photo-height: 88px;
       --card-gap: 8px;
     }
 
@@ -125,8 +125,9 @@
       display: block;
       width: 100%;
       height: var(--card-photo-height);
-      object-fit: cover;
-      background: #dce2e8;
+      object-fit: contain;
+      object-position: center;
+      background: #f8fafb;
     }
 
     .meta {
@@ -391,7 +392,7 @@
       '<option value="' + item + '">' + item + '</option>'
     )).join("");
 
-    const zoomSizes = [72, 96, 128, 168];
+    const zoomSizes = [64, 88, 116, 152];
     let zoomIndex = 1;
 
     function updateZoom() {
