@@ -16,6 +16,8 @@
       --accent-2: #b9462f;
       --chip: #e7f3f1;
       --shadow: 0 12px 34px rgba(21, 31, 43, .14);
+      --card-photo-height: 96px;
+      --card-gap: 8px;
     }
 
     * { box-sizing: border-box; }
@@ -40,15 +42,15 @@
       top: 0;
       z-index: 5;
       margin: 0 -12px 12px;
-      padding: 12px;
+      padding: 10px 12px;
       background: rgba(243, 245, 247, .94);
       border-bottom: 1px solid rgba(220, 226, 232, .85);
       backdrop-filter: blur(14px);
     }
 
     h1 {
-      margin: 0 0 10px;
-      font-size: 23px;
+      margin: 0 0 8px;
+      font-size: 21px;
       line-height: 1.15;
       font-weight: 800;
     }
@@ -59,10 +61,18 @@
       gap: 8px;
     }
 
+    .zoom-controls {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr) 42px;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
     input,
-    select {
+    select,
+    .zoom-btn {
       min-width: 0;
-      height: 42px;
+      height: 38px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--panel);
@@ -74,16 +84,26 @@
     input { padding: 0 12px; }
     select { padding: 0 8px; }
 
+    .zoom-btn {
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .zoom-reset {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
     .count {
       margin: 10px 2px 0;
       color: var(--muted);
-      font-size: 13px;
+      font-size: 12px;
     }
 
     .grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
+      gap: var(--card-gap);
     }
 
     .person {
@@ -104,14 +124,14 @@
     .photo {
       display: block;
       width: 100%;
-      aspect-ratio: 1 / 1;
+      height: var(--card-photo-height);
       object-fit: cover;
       background: #dce2e8;
     }
 
     .meta {
-      min-height: 86px;
-      padding: 10px;
+      min-height: 50px;
+      padding: 7px 8px;
     }
 
     .name-row {
@@ -123,7 +143,7 @@
 
     .name {
       min-width: 0;
-      font-size: 18px;
+      font-size: 16px;
       line-height: 1.2;
       font-weight: 800;
       overflow-wrap: anywhere;
@@ -132,16 +152,19 @@
     .pid {
       flex: 0 0 auto;
       color: var(--muted);
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
     }
 
     .title {
       margin-top: 4px;
       color: var(--accent-2);
-      font-size: 14px;
+      font-size: 12px;
       line-height: 1.3;
       font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .chips {
@@ -160,6 +183,14 @@
       font-size: 12px;
       line-height: 1.2;
       overflow-wrap: anywhere;
+    }
+
+    .person .chips {
+      display: none;
+    }
+
+    .modal-chips {
+      display: flex;
     }
 
     .empty {
@@ -306,6 +337,11 @@
         <input id="search" type="search" placeholder="搜尋姓名、職稱、社團" autocomplete="off">
         <select id="club"></select>
       </div>
+      <div class="zoom-controls" aria-label="縮放列表">
+        <button class="zoom-btn" id="zoomOut" type="button" aria-label="縮小">−</button>
+        <button class="zoom-btn zoom-reset" id="zoomReset" type="button">重設大小</button>
+        <button class="zoom-btn" id="zoomIn" type="button" aria-label="放大">＋</button>
+      </div>
       <div id="count" class="count"></div>
     </section>
 
@@ -339,6 +375,9 @@
     const grid = document.getElementById("grid");
     const count = document.getElementById("count");
     const empty = document.getElementById("empty");
+    const zoomOut = document.getElementById("zoomOut");
+    const zoomReset = document.getElementById("zoomReset");
+    const zoomIn = document.getElementById("zoomIn");
     const dialog = document.getElementById("dialog");
     const modalPhoto = document.getElementById("modalPhoto");
     const modalName = document.getElementById("modalName");
@@ -351,6 +390,16 @@
     club.innerHTML = '<option value="">全部社團</option>' + clubs.map((item) => (
       '<option value="' + item + '">' + item + '</option>'
     )).join("");
+
+    const zoomSizes = [72, 96, 128, 168];
+    let zoomIndex = 1;
+
+    function updateZoom() {
+      document.documentElement.style.setProperty("--card-photo-height", zoomSizes[zoomIndex] + "px");
+      zoomReset.textContent = "大小 " + (zoomIndex + 1) + " / " + zoomSizes.length;
+      zoomOut.disabled = zoomIndex === 0;
+      zoomIn.disabled = zoomIndex === zoomSizes.length - 1;
+    }
 
     function chipHtml(items) {
       return items.map((item) => '<span class="chip">' + item + '</span>').join("");
@@ -424,6 +473,18 @@
     });
 
     document.getElementById("close").addEventListener("click", () => dialog.close());
+    zoomOut.addEventListener("click", () => {
+      zoomIndex = Math.max(0, zoomIndex - 1);
+      updateZoom();
+    });
+    zoomReset.addEventListener("click", () => {
+      zoomIndex = 1;
+      updateZoom();
+    });
+    zoomIn.addEventListener("click", () => {
+      zoomIndex = Math.min(zoomSizes.length - 1, zoomIndex + 1);
+      updateZoom();
+    });
     modalGallery.addEventListener("click", (event) => {
       const thumb = event.target.closest(".thumb");
       if (!thumb) return;
@@ -432,6 +493,7 @@
     });
     search.addEventListener("input", render);
     club.addEventListener("change", render);
+    updateZoom();
     render();
   </script>
 </body>
