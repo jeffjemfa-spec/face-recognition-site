@@ -325,7 +325,7 @@
       </div>
       <div id="modalTitle" class="modal-title"></div>
       <div id="modalChips" class="chips modal-chips"></div>
-      <div class="gallery-title">相關照片</div>
+      <div id="galleryTitle" class="gallery-title">相關照片</div>
       <div id="modalGallery" class="photo-strip"></div>
     </div>
   </dialog>
@@ -345,6 +345,7 @@
     const modalId = document.getElementById("modalId");
     const modalTitle = document.getElementById("modalTitle");
     const modalChips = document.getElementById("modalChips");
+    const galleryTitle = document.getElementById("galleryTitle");
     const modalGallery = document.getElementById("modalGallery");
 
     club.innerHTML = '<option value="">全部社團</option>' + clubs.map((item) => (
@@ -366,17 +367,11 @@
     }
 
     function galleryItems(person) {
-      const related = people.filter((item) => (
-        item.id !== person.id && item.clubs.some((clubName) => person.clubs.includes(clubName))
-      )).slice(0, 5);
-      return [
-        { label: "主照", src: person.imageData, alt: person.name },
-        ...related.map((item) => ({
-          label: "同社團 " + item.name,
-          src: item.imageData,
-          alt: item.name
-        }))
-      ];
+      return (person.photos || []).map((photo, index) => ({
+        label: photo.label || ("照片 " + (index + 1)),
+        src: photo.src || photo.imageData || person.imageData,
+        alt: photo.alt || person.name
+      }));
     }
 
     function matches(person) {
@@ -393,7 +388,10 @@
       modalId.textContent = person.id;
       modalTitle.textContent = person.title;
       modalChips.innerHTML = chipHtml(person.clubs);
-      modalGallery.innerHTML = galleryItems(person).map((item) => (
+      const gallery = galleryItems(person);
+      galleryTitle.style.display = gallery.length ? "block" : "none";
+      modalGallery.style.display = gallery.length ? "grid" : "none";
+      modalGallery.innerHTML = gallery.map((item) => (
         '<button class="thumb" type="button" data-src="' + escapeHtml(item.src) + '" data-alt="' + escapeHtml(item.alt) + '">' +
           '<img src="' + item.src + '" alt="' + escapeHtml(item.alt) + '" loading="lazy">' +
           '<div class="thumb-label">' + escapeHtml(item.label) + '</div>' +
