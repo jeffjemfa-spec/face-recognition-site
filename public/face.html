@@ -18,6 +18,18 @@
       --shadow: 0 12px 34px rgba(21, 31, 43, .14);
       --card-photo-height: 88px;
       --card-gap: 8px;
+      --card-meta-min-height: 50px;
+      --card-meta-padding-y: 7px;
+      --card-meta-padding-x: 8px;
+      --card-name-size: 16px;
+      --card-id-size: 11px;
+      --card-title-size: 12px;
+      --card-title-margin: 4px;
+      --card-chip-size: 12px;
+      --card-chip-padding-y: 4px;
+      --card-chip-padding-x: 7px;
+      --card-chip-gap: 6px;
+      --card-chip-margin: 8px;
     }
 
     * { box-sizing: border-box; }
@@ -131,8 +143,8 @@
     }
 
     .meta {
-      min-height: 50px;
-      padding: 7px 8px;
+      min-height: var(--card-meta-min-height);
+      padding: var(--card-meta-padding-y) var(--card-meta-padding-x);
     }
 
     .name-row {
@@ -144,7 +156,7 @@
 
     .name {
       min-width: 0;
-      font-size: 16px;
+      font-size: var(--card-name-size);
       line-height: 1.2;
       font-weight: 800;
       overflow-wrap: anywhere;
@@ -153,14 +165,14 @@
     .pid {
       flex: 0 0 auto;
       color: var(--muted);
-      font-size: 11px;
+      font-size: var(--card-id-size);
       font-weight: 700;
     }
 
     .title {
-      margin-top: 4px;
+      margin-top: var(--card-title-margin);
       color: var(--accent-2);
-      font-size: 12px;
+      font-size: var(--card-title-size);
       line-height: 1.3;
       font-weight: 700;
       white-space: nowrap;
@@ -171,17 +183,17 @@
     .chips {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 8px;
+      gap: var(--card-chip-gap);
+      margin-top: var(--card-chip-margin);
     }
 
     .chip {
       max-width: 100%;
-      padding: 4px 7px;
+      padding: var(--card-chip-padding-y) var(--card-chip-padding-x);
       border-radius: 999px;
       background: var(--chip);
       color: #075d56;
-      font-size: 12px;
+      font-size: var(--card-chip-size);
       line-height: 1.2;
       overflow-wrap: anywhere;
     }
@@ -392,11 +404,91 @@
       '<option value="' + item + '">' + item + '</option>'
     )).join("");
 
-    const zoomSizes = [64, 88, 116, 152];
+    const zoomSizes = [
+      {
+        photo: 64,
+        gap: 6,
+        metaMin: 40,
+        metaPadY: 5,
+        metaPadX: 6,
+        name: 13,
+        id: 9,
+        title: 10,
+        titleMargin: 2,
+        chip: 10,
+        chipPadY: 2,
+        chipPadX: 5,
+        chipGap: 4,
+        chipMargin: 5
+      },
+      {
+        photo: 88,
+        gap: 8,
+        metaMin: 50,
+        metaPadY: 7,
+        metaPadX: 8,
+        name: 16,
+        id: 11,
+        title: 12,
+        titleMargin: 4,
+        chip: 12,
+        chipPadY: 4,
+        chipPadX: 7,
+        chipGap: 6,
+        chipMargin: 8
+      },
+      {
+        photo: 116,
+        gap: 10,
+        metaMin: 64,
+        metaPadY: 9,
+        metaPadX: 10,
+        name: 18,
+        id: 12,
+        title: 14,
+        titleMargin: 5,
+        chip: 13,
+        chipPadY: 4,
+        chipPadX: 8,
+        chipGap: 7,
+        chipMargin: 9
+      },
+      {
+        photo: 152,
+        gap: 12,
+        metaMin: 78,
+        metaPadY: 11,
+        metaPadX: 12,
+        name: 21,
+        id: 13,
+        title: 16,
+        titleMargin: 6,
+        chip: 14,
+        chipPadY: 5,
+        chipPadX: 9,
+        chipGap: 8,
+        chipMargin: 10
+      }
+    ];
     let zoomIndex = 1;
 
     function updateZoom() {
-      document.documentElement.style.setProperty("--card-photo-height", zoomSizes[zoomIndex] + "px");
+      const size = zoomSizes[zoomIndex];
+      const root = document.documentElement.style;
+      root.setProperty("--card-photo-height", size.photo + "px");
+      root.setProperty("--card-gap", size.gap + "px");
+      root.setProperty("--card-meta-min-height", size.metaMin + "px");
+      root.setProperty("--card-meta-padding-y", size.metaPadY + "px");
+      root.setProperty("--card-meta-padding-x", size.metaPadX + "px");
+      root.setProperty("--card-name-size", size.name + "px");
+      root.setProperty("--card-id-size", size.id + "px");
+      root.setProperty("--card-title-size", size.title + "px");
+      root.setProperty("--card-title-margin", size.titleMargin + "px");
+      root.setProperty("--card-chip-size", size.chip + "px");
+      root.setProperty("--card-chip-padding-y", size.chipPadY + "px");
+      root.setProperty("--card-chip-padding-x", size.chipPadX + "px");
+      root.setProperty("--card-chip-gap", size.chipGap + "px");
+      root.setProperty("--card-chip-margin", size.chipMargin + "px");
       zoomReset.textContent = "大小 " + (zoomIndex + 1) + " / " + zoomSizes.length;
       zoomOut.disabled = zoomIndex === 0;
       zoomIn.disabled = zoomIndex === zoomSizes.length - 1;
