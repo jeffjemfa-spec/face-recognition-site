@@ -16,12 +16,12 @@
       --accent-2: #b9462f;
       --chip: #e7f3f1;
       --shadow: 0 12px 34px rgba(21, 31, 43, .14);
-      --card-photo-height: 88px;
+      --card-photo-height: 106px;
       --card-gap: 8px;
-      --card-meta-min-height: 50px;
-      --card-meta-padding-y: 7px;
-      --card-meta-padding-x: 8px;
-      --card-name-size: 16px;
+      --card-meta-min-height: 18px;
+      --card-meta-padding-y: 0px;
+      --card-meta-padding-x: 5px;
+      --card-name-size: 13px;
       --card-id-size: 11px;
       --card-title-size: 12px;
       --card-title-margin: 4px;
@@ -54,10 +54,45 @@
       top: 0;
       z-index: 5;
       margin: 0 -12px 12px;
-      padding: 10px 12px;
+      padding: 6px 12px;
       background: rgba(243, 245, 247, .94);
       border-bottom: 1px solid rgba(220, 226, 232, .85);
       backdrop-filter: blur(14px);
+    }
+
+    .toolbar-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 30px;
+      cursor: pointer;
+      list-style: none;
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .toolbar-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .toolbar-summary::after {
+      content: "工具";
+      padding: 5px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .topbar[open] .toolbar-summary {
+      margin-bottom: 8px;
+    }
+
+    .topbar[open] .toolbar-summary::after {
+      content: "收合";
     }
 
     h1 {
@@ -145,21 +180,25 @@
     .meta {
       min-height: var(--card-meta-min-height);
       padding: var(--card-meta-padding-y) var(--card-meta-padding-x);
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .name-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 8px;
+      min-width: 0;
+      width: 100%;
     }
 
     .name {
       min-width: 0;
       font-size: var(--card-name-size);
-      line-height: 1.2;
+      line-height: 1;
       font-weight: 800;
-      overflow-wrap: anywhere;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .pid {
@@ -344,19 +383,22 @@
 </head>
 <body>
   <main>
-    <section class="topbar">
-      <h1>人臉資料卡</h1>
-      <div class="tools">
-        <input id="search" type="search" placeholder="搜尋姓名、職稱、社團" autocomplete="off">
-        <select id="club"></select>
+    <details class="topbar">
+      <summary class="toolbar-summary">人臉資料卡</summary>
+      <div class="toolbar-panel">
+        <h1>人臉資料卡</h1>
+        <div class="tools">
+          <input id="search" type="search" placeholder="搜尋姓名、職稱、社團" autocomplete="off">
+          <select id="club"></select>
+        </div>
+        <div class="zoom-controls" aria-label="縮放列表">
+          <button class="zoom-btn" id="zoomOut" type="button" aria-label="縮小">−</button>
+          <button class="zoom-btn zoom-reset" id="zoomReset" type="button">重設大小</button>
+          <button class="zoom-btn" id="zoomIn" type="button" aria-label="放大">＋</button>
+        </div>
+        <div id="count" class="count"></div>
       </div>
-      <div class="zoom-controls" aria-label="縮放列表">
-        <button class="zoom-btn" id="zoomOut" type="button" aria-label="縮小">−</button>
-        <button class="zoom-btn zoom-reset" id="zoomReset" type="button">重設大小</button>
-        <button class="zoom-btn" id="zoomIn" type="button" aria-label="放大">＋</button>
-      </div>
-      <div id="count" class="count"></div>
-    </section>
+    </details>
 
     <section id="grid" class="grid" aria-live="polite"></section>
     <div id="empty" class="empty">找不到符合的人物</div>
@@ -406,12 +448,12 @@
 
     const zoomSizes = [
       {
-        photo: 64,
+        photo: 80,
         gap: 6,
-        metaMin: 40,
-        metaPadY: 5,
-        metaPadX: 6,
-        name: 13,
+        metaMin: 16,
+        metaPadY: 0,
+        metaPadX: 4,
+        name: 11,
         id: 9,
         title: 10,
         titleMargin: 2,
@@ -422,12 +464,12 @@
         chipMargin: 5
       },
       {
-        photo: 88,
+        photo: 106,
         gap: 8,
-        metaMin: 50,
-        metaPadY: 7,
-        metaPadX: 8,
-        name: 16,
+        metaMin: 18,
+        metaPadY: 0,
+        metaPadX: 5,
+        name: 13,
         id: 11,
         title: 12,
         titleMargin: 4,
@@ -438,12 +480,12 @@
         chipMargin: 8
       },
       {
-        photo: 116,
+        photo: 138,
         gap: 10,
-        metaMin: 64,
-        metaPadY: 9,
-        metaPadX: 10,
-        name: 18,
+        metaMin: 22,
+        metaPadY: 0,
+        metaPadX: 6,
+        name: 15,
         id: 12,
         title: 14,
         titleMargin: 5,
@@ -454,12 +496,12 @@
         chipMargin: 9
       },
       {
-        photo: 152,
+        photo: 180,
         gap: 12,
-        metaMin: 78,
-        metaPadY: 11,
-        metaPadX: 12,
-        name: 21,
+        metaMin: 28,
+        metaPadY: 0,
+        metaPadX: 8,
+        name: 18,
         id: 13,
         title: 16,
         titleMargin: 6,
@@ -548,9 +590,7 @@
         '<button class="person" type="button" data-id="' + person.id + '">' +
           '<img class="photo" src="' + person.imageData + '" alt="' + person.name + '" loading="' + (index < 4 ? "eager" : "lazy") + '">' +
           '<div class="meta">' +
-            '<div class="name-row"><div class="name">' + person.name + '</div><div class="pid">' + person.id + '</div></div>' +
-            '<div class="title">' + person.title + '</div>' +
-            '<div class="chips">' + chipHtml(person.clubs) + '</div>' +
+            '<div class="name-row"><div class="name">' + person.name + '</div></div>' +
           '</div>' +
         '</button>'
       )).join("");
