@@ -1,7 +1,9 @@
-const http = require("node:http");
-const fs = require("node:fs");
-const path = require("node:path");
+import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const faceHtml = fs.readFileSync(path.join(__dirname, "public", "face.html"));
 
 const server = http.createServer((req, res) => {
