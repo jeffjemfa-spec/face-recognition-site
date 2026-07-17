@@ -327,6 +327,29 @@
       font-weight: 800;
     }
 
+    .gallery-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .gallery-title-row .gallery-title {
+      margin-top: 0;
+    }
+
+    .main-photo-btn {
+      min-height: 30px;
+      padding: 5px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 850;
+    }
+
     .photo-strip {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -374,7 +397,7 @@
       <div class="toolbar-panel">
         <h1>人臉資料卡</h1>
         <div class="tools">
-          <input id="search" type="search" placeholder="搜尋姓名、職稱、社團" autocomplete="off">
+          <input id="search" type="search" placeholder="搜尋姓名、職稱、社團、備註" autocomplete="off">
           <select id="sortMode">
             <option value="input-desc">最近輸入優先</option>
             <option value="updated-desc">最近修改優先</option>
@@ -411,7 +434,10 @@
       </div>
       <div id="modalTitle" class="modal-title"></div>
       <div id="modalChips" class="chips"></div>
-      <div id="galleryTitle" class="gallery-title">其他照片</div>
+      <div id="galleryControls" class="gallery-title-row">
+        <div id="galleryTitle" class="gallery-title">照片分類</div>
+        <button id="mainPhotoButton" class="main-photo-btn" type="button">回到主照片</button>
+      </div>
       <div id="modalGallery" class="photo-strip"></div>
     </div>
   </dialog>
@@ -437,7 +463,9 @@
     const modalTime = document.getElementById("modalTime");
     const modalTitle = document.getElementById("modalTitle");
     const modalChips = document.getElementById("modalChips");
+    const galleryControls = document.getElementById("galleryControls");
     const galleryTitle = document.getElementById("galleryTitle");
+    const mainPhotoButton = document.getElementById("mainPhotoButton");
     const modalGallery = document.getElementById("modalGallery");
 
     const zoomSizes = [
@@ -483,11 +511,32 @@
       return items.map((item) => '<span class="chip">' + escapeHtml(item) + '</span>').join("");
     }
 
+    function searchTokens() {
+      return search.value.trim().toLowerCase().split(/[\s,，+＋、]+/).filter(Boolean);
+    }
+
+    function personSearchText(person) {
+      const photoText = person.photos.flatMap((item) => [
+        item.id,
+        item.file,
+        item.label,
+        item.alt
+      ]);
+      return [
+        person.id,
+        person.name,
+        person.title,
+        person.updatedLabel,
+        ...person.clubs,
+        ...photoText
+      ].filter(Boolean).join(" ").toLowerCase();
+    }
+
     function matches(person) {
-      const keyword = search.value.trim().toLowerCase();
+      const tokens = searchTokens();
       const filters = selectedClubs();
-      const haystack = [person.id, person.name, person.title, ...person.clubs].join(" ").toLowerCase();
-      return (!keyword || haystack.includes(keyword)) && filters.every((item) => person.clubs.includes(item));
+      const haystack = personSearchText(person);
+      return tokens.every((token) => haystack.includes(token)) && filters.every((item) => person.clubs.includes(item));
     }
 
     function sortPeople(items) {
@@ -510,9 +559,15 @@
       modalTime.textContent = person.updatedLabel ? "修改時間 " + person.updatedLabel : "";
       modalTitle.textContent = person.title;
       modalChips.innerHTML = chipHtml(person.clubs);
-      galleryTitle.style.display = person.photos.length ? "block" : "none";
+      dialog.dataset.mainSrc = person.imageData;
+      dialog.dataset.mainAlt = person.name;
+      galleryControls.style.display = person.photos.length ? "flex" : "none";
       modalGallery.style.display = person.photos.length ? "grid" : "none";
-      modalGallery.innerHTML = person.photos.map((item) => (
+      const photos = [
+        { src: person.imageData, alt: person.name + " 主照片", label: "主照片" },
+        ...person.photos
+      ];
+      modalGallery.innerHTML = photos.map((item) => (
         '<button class="thumb" type="button" data-src="' + escapeHtml(item.src) + '" data-alt="' + escapeHtml(item.alt) + '">' +
           '<img src="' + item.src + '" alt="' + escapeHtml(item.alt) + '" loading="lazy">' +
           '<div class="thumb-label">' + escapeHtml(item.label) + '</div>' +
@@ -546,6 +601,11 @@
       if (!thumb) return;
       modalPhoto.src = thumb.dataset.src;
       modalPhoto.alt = thumb.dataset.alt;
+    });
+
+    mainPhotoButton.addEventListener("click", () => {
+      modalPhoto.src = dialog.dataset.mainSrc;
+      modalPhoto.alt = dialog.dataset.mainAlt;
     });
 
     document.getElementById("close").addEventListener("click", () => dialog.close());
