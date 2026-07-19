@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "build": "next build && mkdir -p dist && cp public/face.html dist/index.html && cp public/face.html dist/face.html",
+    "build": "next build && mkdir -p dist/server dist/.openai && cp public/face.html dist/index.html && cp public/face.html dist/face.html && cp index.mjs dist/server/index.js && cp .openai/hosting.json dist/.openai/hosting.json",
     "start": "next start"
   },
   "dependencies": {
