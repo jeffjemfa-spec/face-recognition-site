@@ -55,7 +55,7 @@
 
     .tools {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 136px;
+      grid-template-columns: minmax(0, 1fr) 126px 104px;
       gap: 8px;
     }
 
@@ -75,6 +75,17 @@
 
     input { padding: 0 12px; }
     select { padding: 0 8px; }
+
+    .name-toggle {
+      padding: 0 10px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .name-toggle[aria-pressed="false"] {
+      color: var(--muted);
+      background: #eef2f5;
+    }
 
     .status {
       margin: 9px 2px 0;
@@ -114,7 +125,7 @@
     }
 
     .meta {
-      padding: 10px;
+      padding: 9px 10px 10px;
     }
 
     .name {
@@ -215,6 +226,16 @@
     @media (min-width: 760px) {
       .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     }
+
+    @media (max-width: 420px) {
+      .tools {
+        grid-template-columns: minmax(0, 1fr) 116px;
+      }
+
+      .name-toggle {
+        grid-column: 1 / -1;
+      }
+    }
   </style>
 </head>
 <body>
@@ -227,6 +248,7 @@
           <option value="input-asc">原始順序</option>
           <option value="name-asc">姓名排序</option>
         </select>
+        <button id="nameToggle" class="name-toggle" type="button" aria-pressed="true">隱藏名字</button>
       </div>
       <div id="status" class="status"></div>
     </section>
@@ -257,6 +279,7 @@
     const empty = document.getElementById("empty");
     const search = document.getElementById("search");
     const sortMode = document.getElementById("sortMode");
+    const nameToggle = document.getElementById("nameToggle");
     const status = document.getElementById("status");
     const dialog = document.getElementById("dialog");
     const modalPhoto = document.getElementById("modalPhoto");
@@ -265,6 +288,7 @@
     const modalInfoLines = document.getElementById("modalInfoLines");
     const modalInfoImage = document.getElementById("modalInfoImage");
     const closeButton = document.getElementById("close");
+    let showNames = true;
 
     function searchable(person) {
       return [person.name, person.title, person.id, ...(person.infoLines || [])].join(" ").toLowerCase();
@@ -274,12 +298,9 @@
       return `
         <button class="person" type="button" data-id="${esc(person.id)}">
           <img class="photo" src="${person.imageData}" alt="${esc(person.name)}">
-          <div class="meta">
+          ${showNames ? `<div class="meta">
             <div class="name">${esc(person.name)}</div>
-            <div class="title">${esc(person.title)}</div>
-            ${(person.infoLines || []).map((line) => `<div class="info-line">${esc(line)}</div>`).join("")}
-            ${person.infoImageData ? `<img class="info-image" src="${person.infoImageData}" alt="${esc(person.name)} 資料">` : ""}
-          </div>
+          </div>` : ""}
         </button>
       `;
     }
@@ -305,7 +326,7 @@
       const rows = filteredPeople();
       grid.innerHTML = rows.map(card).join("");
       empty.style.display = rows.length ? "none" : "block";
-      status.textContent = `已載入 ${people.length} 筆，目前顯示 ${rows.length} 筆`;
+      status.textContent = `已載入 ${people.length} 筆，目前顯示 ${rows.length} 筆，${showNames ? "顯示名字" : "隱藏名字"}`;
     }
 
     function show(person) {
@@ -338,6 +359,12 @@
     });
     search.addEventListener("input", render);
     sortMode.addEventListener("change", render);
+    nameToggle.addEventListener("click", () => {
+      showNames = !showNames;
+      nameToggle.setAttribute("aria-pressed", String(showNames));
+      nameToggle.textContent = showNames ? "隱藏名字" : "顯示名字";
+      render();
+    });
 
     render();
   </script>
