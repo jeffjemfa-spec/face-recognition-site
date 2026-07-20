@@ -84,22 +84,6 @@
       line-height: 1.35;
     }
 
-    .page-group {
-      margin-top: 12px;
-      scroll-margin-top: 84px;
-    }
-
-    .page-group:first-of-type {
-      margin-top: 0;
-    }
-
-    .page-label {
-      margin: 0 2px 8px;
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 850;
-    }
-
     .grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -119,8 +103,9 @@
     .photo {
       display: block;
       width: 100%;
+      aspect-ratio: 3 / 4;
       height: auto;
-      object-fit: cover;
+      object-fit: contain;
       background: #f8fafb;
     }
 
@@ -242,7 +227,7 @@
       <div id="status" class="status"></div>
     </section>
 
-    <section id="grid" class="results" aria-live="polite"></section>
+    <section id="grid" class="grid" aria-live="polite"></section>
     <div id="empty" class="empty">找不到符合的人物</div>
   </main>
 
@@ -295,15 +280,6 @@
       `;
     }
 
-    function pageGroup(rows, pageIndex) {
-      return `
-        <section class="page-group" aria-label="第 ${pageIndex + 1} 頁">
-          <div class="page-label">第 ${pageIndex + 1} 頁</div>
-          <div class="grid">${rows.map(card).join("")}</div>
-        </section>
-      `;
-    }
-
     function esc(value) {
       return String(value || "")
         .replaceAll("&", "&amp;")
@@ -323,13 +299,9 @@
 
     function render() {
       const rows = filteredPeople();
-      const pages = [];
-      for (let index = 0; index < rows.length; index += 8) {
-        pages.push(rows.slice(index, index + 8));
-      }
-      grid.innerHTML = pages.map(pageGroup).join("");
+      grid.innerHTML = rows.map(card).join("");
       empty.style.display = rows.length ? "none" : "block";
-      status.textContent = `已載入 ${people.length} 筆，目前顯示 ${rows.length} 筆，每頁 8 筆，共 ${pages.length} 頁`;
+      status.textContent = `已載入 ${people.length} 筆，目前顯示 ${rows.length} 筆`;
     }
 
     function show(person) {
