@@ -441,7 +441,7 @@
         const matchesDetails = filterGroups.every((group) => {
           const selected = selectedFilters[group.key];
           const values = Array.isArray(person[group.key]) ? person[group.key] : [person[group.key]].filter(Boolean);
-          return selected.size === 0 || values.some((value) => selected.has(value));
+          return selected.size === 0 || [...selected].every((value) => values.includes(value));
         });
         return matchesText && matchesDetails;
       });
