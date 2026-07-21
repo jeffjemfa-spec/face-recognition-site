@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes, viewport-fit=cover">
   <title>人臉資料卡</title>
   <style>
     :root {
@@ -103,7 +103,7 @@
 
     .panel-row {
       display: grid;
-      grid-template-columns: minmax(0, 136px) minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 136px) minmax(0, 124px) minmax(0, 1fr) minmax(0, 1fr);
       gap: 8px;
       align-items: center;
     }
@@ -175,6 +175,23 @@
       line-height: 1.35;
     }
 
+    .scaled-content {
+      --view-scale: 1;
+      transform-origin: top center;
+    }
+
+    @supports (zoom: 1) {
+      .scaled-content { zoom: var(--view-scale); }
+    }
+
+    @supports not (zoom: 1) {
+      .scaled-content {
+        width: calc(100% / var(--view-scale));
+        margin: 0 auto;
+        transform: scale(var(--view-scale));
+      }
+    }
+
     .grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -231,6 +248,40 @@
       font-size: 13px;
       line-height: 1.35;
       overflow-wrap: anywhere;
+    }
+
+    .notes {
+      margin-top: 12px;
+    }
+
+    .notes-label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+      font-weight: 850;
+    }
+
+    .notes-input {
+      display: block;
+      width: 100%;
+      min-height: 92px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      font-size: 16px;
+      line-height: 1.45;
+      outline: none;
+      resize: vertical;
+    }
+
+    .notes-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(11, 127, 114, .14);
     }
 
     .info-image {
@@ -332,6 +383,13 @@
           <option value="input-asc">原始順序</option>
           <option value="name-asc">姓名排序</option>
         </select>
+          <select id="viewScale" aria-label="畫面比例">
+            <option value="0.5">畫面 50%</option>
+            <option value="0.75">畫面 75%</option>
+            <option value="1" selected>畫面 100%</option>
+            <option value="1.25">畫面 125%</option>
+            <option value="1.5">畫面 150%</option>
+          </select>
           <label class="check"><input id="showNamesInput" type="checkbox" checked> 顯示人名</label>
           <button id="detailToggle" class="detail-toggle" type="button" aria-expanded="false">展開詳細分類</button>
         </div>
@@ -341,8 +399,10 @@
       </section>
     </section>
 
-    <section id="grid" class="grid" aria-live="polite"></section>
-    <div id="empty" class="empty">找不到符合的人物</div>
+    <div id="scaledContent" class="scaled-content">
+      <section id="grid" class="grid" aria-live="polite"></section>
+      <div id="empty" class="empty">找不到符合的人物</div>
+    </div>
   </main>
 
   <dialog id="dialog">
@@ -356,6 +416,10 @@
         <button class="close" id="close" type="button" aria-label="關閉">×</button>
       </div>
       <div id="modalInfoLines"></div>
+      <div class="notes">
+        <label class="notes-label" for="modalNotes">備註</label>
+        <textarea id="modalNotes" class="notes-input" rows="4" placeholder="輸入備註"></textarea>
+      </div>
       <img id="modalInfoImage" class="info-image" alt="">
     </div>
   </dialog>
@@ -367,6 +431,8 @@
     const empty = document.getElementById("empty");
     const search = document.getElementById("search");
     const sortMode = document.getElementById("sortMode");
+    const viewScale = document.getElementById("viewScale");
+    const scaledContent = document.getElementById("scaledContent");
     const panelToggle = document.getElementById("panelToggle");
     const infoPanel = document.getElementById("infoPanel");
     const showNamesInput = document.getElementById("showNamesInput");
@@ -378,13 +444,32 @@
     const modalName = document.getElementById("modalName");
     const modalTitle = document.getElementById("modalTitle");
     const modalInfoLines = document.getElementById("modalInfoLines");
+    const modalNotes = document.getElementById("modalNotes");
     const modalInfoImage = document.getElementById("modalInfoImage");
     const closeButton = document.getElementById("close");
     let showNames = true;
+    let activePersonId = "";
+    const scaleKey = "faceCardsViewScale:v1";
+    const notesKey = "faceCardsNotes:v1";
+    const savedNotes = (() => {
+      try {
+        return JSON.parse(localStorage.getItem(notesKey) || "{}");
+      } catch {
+        return {};
+      }
+    })();
     const filterGroups = [
       { key: "detailCategories", label: "類別", values: ["EMBA", "113", "114", "扶輪社"] },
     ];
     const selectedFilters = Object.fromEntries(filterGroups.map((group) => [group.key, new Set()]));
+
+    function applyViewScale(value) {
+      const allowed = ["0.5", "0.75", "1", "1.25", "1.5"];
+      const scale = allowed.includes(value) ? value : "1";
+      viewScale.value = scale;
+      scaledContent.style.setProperty("--view-scale", scale);
+      localStorage.setItem(scaleKey, scale);
+    }
 
     function searchable(person) {
       return [
@@ -396,6 +481,7 @@
         ...(person.detailCategories || []),
         ...(person.clubs || []),
         ...(person.infoLines || []),
+        savedNotes[person.id] || "",
       ].join(" ").toLowerCase();
     }
 
@@ -466,11 +552,13 @@
     }
 
     function show(person) {
+      activePersonId = person.id;
       modalPhoto.src = person.imageData;
       modalPhoto.alt = person.name;
       modalName.textContent = person.name;
       modalTitle.textContent = person.title || "";
       modalInfoLines.innerHTML = (person.infoLines || []).map((line) => `<div class="info-line">${esc(line)}</div>`).join("");
+      modalNotes.value = savedNotes[person.id] || "";
       if (person.infoImageData) {
         modalInfoImage.src = person.infoImageData;
         modalInfoImage.alt = `${person.name} 資料`;
@@ -489,12 +577,20 @@
       if (person) show(person);
     });
 
+    modalNotes.addEventListener("input", () => {
+      if (!activePersonId) return;
+      const value = modalNotes.value.trim();
+      if (value) savedNotes[activePersonId] = value;
+      else delete savedNotes[activePersonId];
+      localStorage.setItem(notesKey, JSON.stringify(savedNotes));
+    });
     closeButton.addEventListener("click", () => dialog.close());
     dialog.addEventListener("click", (event) => {
       if (event.target === dialog) dialog.close();
     });
     search.addEventListener("input", render);
     sortMode.addEventListener("change", render);
+    viewScale.addEventListener("change", () => applyViewScale(viewScale.value));
     panelToggle.addEventListener("click", () => {
       const willOpen = infoPanel.hidden;
       infoPanel.hidden = !willOpen;
@@ -526,6 +622,7 @@
     });
 
     renderDetailFilters();
+    applyViewScale(localStorage.getItem(scaleKey) || "1");
     render();
   </script>
 </body>
