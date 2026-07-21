@@ -47,16 +47,20 @@
     }
 
     h1 {
-      margin: 0 0 8px;
-      font-size: 22px;
+      min-width: 4.6em;
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
       line-height: 1.15;
       font-weight: 850;
+      white-space: nowrap;
     }
 
-    .tools {
+    .compact-tools {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 136px;
+      grid-template-columns: auto minmax(0, 1fr) 76px;
       gap: 8px;
+      align-items: center;
     }
 
     input,
@@ -78,10 +82,9 @@
 
     .panel-toggle {
       width: 100%;
-      margin-top: 8px;
       padding: 0 12px;
       font-weight: 800;
-      text-align: left;
+      text-align: center;
     }
 
     .panel-toggle[aria-expanded="true"] {
@@ -99,11 +102,10 @@
     }
 
     .panel-row {
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: minmax(0, 136px) minmax(0, 1fr) minmax(0, 1fr);
       gap: 8px;
       align-items: center;
-      justify-content: space-between;
     }
 
     .hint {
@@ -115,10 +117,9 @@
 
     .detail-toggle {
       width: 100%;
-      margin-top: 10px;
       padding: 0 12px;
       font-weight: 800;
-      text-align: left;
+      text-align: center;
     }
 
     .detail-toggle[aria-expanded="true"] {
@@ -167,7 +168,7 @@
     }
 
     .status {
-      margin: 9px 2px 0;
+      margin: 8px 2px 0;
       min-height: 18px;
       color: var(--muted);
       font-size: 13px;
@@ -307,7 +308,11 @@
     }
 
     @media (max-width: 420px) {
-      .tools {
+      .compact-tools {
+        grid-template-columns: auto minmax(0, 1fr) 72px;
+      }
+
+      .panel-row {
         grid-template-columns: minmax(0, 1fr);
       }
     }
@@ -316,24 +321,24 @@
 <body>
   <main>
     <section class="topbar">
-      <h1>人臉資料卡</h1>
-      <div class="tools">
+      <div class="compact-tools">
+        <h1>人臉資料卡</h1>
         <input id="search" type="search" placeholder="搜尋姓名、班別、公司、類別" autocomplete="off">
+        <button id="panelToggle" class="panel-toggle" type="button" aria-expanded="false">展開</button>
+      </div>
+      <section id="infoPanel" class="info-panel" hidden>
+        <div class="panel-row">
         <select id="sortMode">
           <option value="input-asc">原始順序</option>
           <option value="name-asc">姓名排序</option>
         </select>
-      </div>
-      <button id="panelToggle" class="panel-toggle" type="button" aria-expanded="false">展開說明</button>
-      <section id="infoPanel" class="info-panel" hidden>
-        <div class="panel-row">
           <label class="check"><input id="showNamesInput" type="checkbox" checked> 顯示人名</label>
+          <button id="detailToggle" class="detail-toggle" type="button" aria-expanded="false">展開詳細分類</button>
         </div>
         <p class="hint">用上方搜尋框輸入關鍵字篩選，可搜尋姓名、113/114班別、公司、職稱、營業項目、類別。</p>
-        <button id="detailToggle" class="detail-toggle" type="button" aria-expanded="false">展開詳細分類</button>
         <section id="detailFilters" class="detail-filters" hidden></section>
+        <div id="status" class="status"></div>
       </section>
-      <div id="status" class="status"></div>
     </section>
 
     <section id="grid" class="grid" aria-live="polite"></section>
@@ -494,7 +499,12 @@
       const willOpen = infoPanel.hidden;
       infoPanel.hidden = !willOpen;
       panelToggle.setAttribute("aria-expanded", String(willOpen));
-      panelToggle.textContent = willOpen ? "收合說明" : "展開說明";
+      panelToggle.textContent = willOpen ? "收合" : "展開";
+      if (!willOpen) {
+        detailFilters.hidden = true;
+        detailToggle.setAttribute("aria-expanded", "false");
+        detailToggle.textContent = "展開詳細分類";
+      }
     });
     showNamesInput.addEventListener("change", () => {
       showNames = showNamesInput.checked;
