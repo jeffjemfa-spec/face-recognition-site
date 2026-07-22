@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "人臉資料卡",
+  title: "照片瀏覽",
 };
 
 export default function RootLayout({ children }) {
