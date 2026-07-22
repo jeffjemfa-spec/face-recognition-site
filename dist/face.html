@@ -41,9 +41,9 @@
       z-index: 5;
       margin: 0 -12px 12px;
       padding: 10px 12px;
-      background: rgba(243, 245, 247, .94);
-      border-bottom: 1px solid rgba(220, 226, 232, .85);
-      backdrop-filter: blur(14px);
+      background: transparent;
+      border-bottom: 0;
+      backdrop-filter: none;
     }
 
     .compact-tools {
@@ -283,7 +283,7 @@
 
     dialog {
       width: min(calc(100% - 24px), 520px);
-      max-height: min(92vh, 820px);
+      max-height: min(92dvh, 820px);
       margin: auto;
       padding: 0;
       border: 0;
@@ -292,7 +292,10 @@
       background: var(--panel);
       color: var(--ink);
       box-shadow: var(--shadow);
+      flex-direction: column;
     }
+
+    dialog[open] { display: flex; }
 
     dialog::backdrop {
       background: rgba(20, 26, 32, .58);
@@ -301,19 +304,21 @@
 
     .photo-stage {
       display: block;
+      flex: 0 0 auto;
       width: 100%;
-      max-height: 50vh;
+      max-height: 46dvh;
       overflow: hidden;
       background: #f8fafb;
       touch-action: none;
       user-select: none;
+      cursor: pointer;
     }
 
     .modal-photo {
       display: block;
       width: 100%;
       height: auto;
-      max-height: 50vh;
+      max-height: 46dvh;
       object-fit: contain;
       background: #f8fafb;
       transform: translate3d(var(--photo-x, 0px), var(--photo-y, 0px), 0) scale(var(--photo-scale, 1));
@@ -323,7 +328,14 @@
       -webkit-user-drag: none;
     }
 
-    .modal-body { padding: 16px; }
+    .modal-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      padding: 16px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
 
     .modal-head {
       display: flex;
@@ -483,6 +495,7 @@
     const photoPointers = new Map();
     let photoZoom = { scale: 1, x: 0, y: 0 };
     let photoGesture = null;
+    let photoGestureMoved = false;
     const cardPointers = new Map();
     let cardZoom = { scale: 1, x: 0, y: 0 };
     let cardGesture = null;
@@ -517,6 +530,7 @@
     function resetPhotoZoom() {
       photoPointers.clear();
       photoGesture = null;
+      photoGestureMoved = false;
       photoZoom = { scale: 1, x: 0, y: 0 };
       applyPhotoZoom();
     }
@@ -556,16 +570,20 @@
       const points = pointerList();
       if (!photoGesture || !points.length) return;
       if (photoGesture.mode === "pan" && points.length === 1 && photoZoom.scale > 1) {
+        const dx = points[0].x - photoGesture.start.x;
+        const dy = points[0].y - photoGesture.start.y;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) photoGestureMoved = true;
         photoZoom = {
           scale: photoGesture.base.scale,
-          x: photoGesture.base.x + points[0].x - photoGesture.start.x,
-          y: photoGesture.base.y + points[0].y - photoGesture.start.y,
+          x: photoGesture.base.x + dx,
+          y: photoGesture.base.y + dy,
         };
         applyPhotoZoom();
       } else if (photoGesture.mode === "pinch" && points.length >= 2) {
         const center = midpoint(points[0], points[1]);
         const nextScale = clamp(photoGesture.base.scale * (distance(points[0], points[1]) / photoGesture.startDistance), 1, 5);
         const ratio = nextScale / photoGesture.base.scale;
+        photoGestureMoved = true;
         photoZoom = {
           scale: nextScale,
           x: center.x - (photoGesture.startCenter.x - photoGesture.base.x) * ratio,
@@ -866,6 +884,7 @@
       event.preventDefault();
       photoStage.setPointerCapture(event.pointerId);
       photoPointers.set(event.pointerId, stagePoint(event));
+      photoGestureMoved = false;
       startPhotoGesture();
     });
     photoStage.addEventListener("pointermove", (event) => {
@@ -876,6 +895,10 @@
     });
     photoStage.addEventListener("pointerup", (event) => {
       photoPointers.delete(event.pointerId);
+      if (!photoPointers.size && !photoGestureMoved) {
+        dialog.close();
+        return;
+      }
       startPhotoGesture();
     });
     photoStage.addEventListener("pointercancel", (event) => {
