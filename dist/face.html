@@ -358,7 +358,21 @@
       .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     }
 
-    @media (max-width: 420px) {
+    @media (max-width: 720px) {
+      .panel-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .check {
+        justify-content: center;
+      }
+
+      .detail-toggle {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 480px) {
       .compact-tools {
         grid-template-columns: auto minmax(0, 1fr) 72px;
       }
