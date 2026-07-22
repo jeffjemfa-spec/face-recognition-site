@@ -577,15 +577,23 @@
     }
 
     function constrainCardZoom(zoom) {
-      if (zoom.scale <= 1) return { scale: 1, x: 0, y: 0 };
+      const scale = Math.abs(zoom.scale - 1) < 0.03 ? 1 : clamp(zoom.scale, 0.55, 4);
+      if (scale === 1) return { scale: 1, x: 0, y: 0 };
       const stageWidth = cardStage.clientWidth;
       const stageHeight = cardStage.clientHeight;
-      const gridWidth = grid.offsetWidth * zoom.scale;
-      const gridHeight = grid.offsetHeight * zoom.scale;
+      const gridWidth = grid.offsetWidth * scale;
+      const gridHeight = grid.offsetHeight * scale;
+      if (scale < 1) {
+        return {
+          scale,
+          x: (stageWidth - gridWidth) / 2,
+          y: 0,
+        };
+      }
       const minX = Math.min(0, stageWidth - gridWidth);
       const minY = Math.min(0, stageHeight - gridHeight);
       return {
-        scale: zoom.scale,
+        scale,
         x: clamp(zoom.x, minX, 0),
         y: clamp(zoom.y, minY, 0),
       };
@@ -644,7 +652,7 @@
         applyCardZoom();
       } else if (cardGesture.mode === "pinch" && points.length >= 2) {
         const center = midpoint(points[0], points[1]);
-        const nextScale = clamp(cardGesture.base.scale * (distance(points[0], points[1]) / cardGesture.startDistance), 1, 4);
+        const nextScale = clamp(cardGesture.base.scale * (distance(points[0], points[1]) / cardGesture.startDistance), 0.55, 4);
         const ratio = nextScale / cardGesture.base.scale;
         cardGestureMoved = true;
         cardZoom = {
