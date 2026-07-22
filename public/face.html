@@ -179,6 +179,18 @@
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
+      transform: translate3d(var(--cards-x, 0px), var(--cards-y, 0px), 0) scale(var(--cards-scale, 1));
+      transform-origin: 0 0;
+      will-change: transform;
+    }
+
+    .card-stage {
+      overflow: hidden;
+      touch-action: pan-y;
+    }
+
+    .card-stage.is-zooming {
+      touch-action: none;
     }
 
     .person {
@@ -405,7 +417,7 @@
       </section>
     </section>
 
-    <div>
+    <div id="cardStage" class="card-stage">
       <section id="grid" class="grid" aria-live="polite"></section>
       <div id="empty" class="empty">找不到符合的人物</div>
     </div>
@@ -437,6 +449,7 @@
 
     const grid = document.getElementById("grid");
     const empty = document.getElementById("empty");
+    const cardStage = document.getElementById("cardStage");
     const search = document.getElementById("search");
     const sortMode = document.getElementById("sortMode");
     const panelToggle = document.getElementById("panelToggle");
@@ -471,6 +484,10 @@
     const photoPointers = new Map();
     let photoZoom = { scale: 1, x: 0, y: 0 };
     let photoGesture = null;
+    const cardPointers = new Map();
+    let cardZoom = { scale: 1, x: 0, y: 0 };
+    let cardGesture = null;
+    let cardGestureMoved = false;
 
     function clamp(value, min, max) {
       return Math.min(max, Math.max(min, value));
@@ -556,6 +573,86 @@
           y: center.y - (photoGesture.startCenter.y - photoGesture.base.y) * ratio,
         };
         applyPhotoZoom();
+      }
+    }
+
+    function constrainCardZoom(zoom) {
+      if (zoom.scale <= 1) return { scale: 1, x: 0, y: 0 };
+      const stageWidth = cardStage.clientWidth;
+      const stageHeight = cardStage.clientHeight;
+      const gridWidth = grid.offsetWidth * zoom.scale;
+      const gridHeight = grid.offsetHeight * zoom.scale;
+      const minX = Math.min(0, stageWidth - gridWidth);
+      const minY = Math.min(0, stageHeight - gridHeight);
+      return {
+        scale: zoom.scale,
+        x: clamp(zoom.x, minX, 0),
+        y: clamp(zoom.y, minY, 0),
+      };
+    }
+
+    function applyCardZoom() {
+      cardZoom = constrainCardZoom(cardZoom);
+      grid.style.setProperty("--cards-scale", cardZoom.scale);
+      grid.style.setProperty("--cards-x", `${cardZoom.x}px`);
+      grid.style.setProperty("--cards-y", `${cardZoom.y}px`);
+      cardStage.classList.toggle("is-zooming", cardZoom.scale > 1);
+    }
+
+    function resetCardZoom() {
+      cardPointers.clear();
+      cardGesture = null;
+      cardZoom = { scale: 1, x: 0, y: 0 };
+      applyCardZoom();
+    }
+
+    function cardPoint(event) {
+      const rect = cardStage.getBoundingClientRect();
+      return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    }
+
+    function cardPointerList() {
+      return [...cardPointers.values()];
+    }
+
+    function startCardGesture() {
+      const points = cardPointerList();
+      if (points.length === 1) {
+        cardGesture = { mode: "pan", start: points[0], base: { ...cardZoom } };
+      } else if (points.length >= 2) {
+        cardGesture = {
+          mode: "pinch",
+          startDistance: distance(points[0], points[1]) || 1,
+          startCenter: midpoint(points[0], points[1]),
+          base: { ...cardZoom },
+        };
+      }
+    }
+
+    function updateCardGesture() {
+      const points = cardPointerList();
+      if (!cardGesture || !points.length) return;
+      if (cardGesture.mode === "pan" && points.length === 1 && cardZoom.scale > 1) {
+        const dx = points[0].x - cardGesture.start.x;
+        const dy = points[0].y - cardGesture.start.y;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) cardGestureMoved = true;
+        cardZoom = {
+          scale: cardGesture.base.scale,
+          x: cardGesture.base.x + dx,
+          y: cardGesture.base.y + dy,
+        };
+        applyCardZoom();
+      } else if (cardGesture.mode === "pinch" && points.length >= 2) {
+        const center = midpoint(points[0], points[1]);
+        const nextScale = clamp(cardGesture.base.scale * (distance(points[0], points[1]) / cardGesture.startDistance), 1, 4);
+        const ratio = nextScale / cardGesture.base.scale;
+        cardGestureMoved = true;
+        cardZoom = {
+          scale: nextScale,
+          x: center.x - (cardGesture.startCenter.x - cardGesture.base.x) * ratio,
+          y: center.y - (cardGesture.startCenter.y - cardGesture.base.y) * ratio,
+        };
+        applyCardZoom();
       }
     }
 
@@ -660,6 +757,10 @@
     }
 
     grid.addEventListener("click", (event) => {
+      if (cardGestureMoved) {
+        cardGestureMoved = false;
+        return;
+      }
       const button = event.target.closest(".person");
       if (!button) return;
       const person = people.find((item) => item.id === button.dataset.id);
@@ -708,6 +809,27 @@
       else selectedFilters[key].delete(event.target.value);
       render();
     });
+    cardStage.addEventListener("pointerdown", (event) => {
+      cardStage.setPointerCapture(event.pointerId);
+      cardPointers.set(event.pointerId, cardPoint(event));
+      cardGestureMoved = false;
+      startCardGesture();
+    });
+    cardStage.addEventListener("pointermove", (event) => {
+      if (!cardPointers.has(event.pointerId)) return;
+      if (cardZoom.scale > 1 || cardPointers.size > 1) event.preventDefault();
+      cardPointers.set(event.pointerId, cardPoint(event));
+      updateCardGesture();
+    });
+    cardStage.addEventListener("pointerup", (event) => {
+      cardPointers.delete(event.pointerId);
+      startCardGesture();
+    });
+    cardStage.addEventListener("pointercancel", (event) => {
+      cardPointers.delete(event.pointerId);
+      startCardGesture();
+    });
+    cardStage.addEventListener("dblclick", resetCardZoom);
     photoStage.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       photoStage.setPointerCapture(event.pointerId);
