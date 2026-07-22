@@ -175,23 +175,6 @@
       line-height: 1.35;
     }
 
-    .scaled-content {
-      --view-scale: 1;
-      transform-origin: top center;
-    }
-
-    @supports (zoom: 1) {
-      .scaled-content { zoom: var(--view-scale); }
-    }
-
-    @supports not (zoom: 1) {
-      .scaled-content {
-        width: calc(100% / var(--view-scale));
-        margin: 0 auto;
-        transform: scale(var(--view-scale));
-      }
-    }
-
     .grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -318,12 +301,28 @@
       backdrop-filter: blur(5px);
     }
 
-    .modal-photo {
+    .photo-stage {
       display: block;
       width: 100%;
       max-height: 50vh;
+      overflow: hidden;
+      background: #f8fafb;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .modal-photo {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: 50vh;
       object-fit: contain;
       background: #f8fafb;
+      transform: translate3d(var(--photo-x, 0px), var(--photo-y, 0px), 0) scale(var(--photo-scale, 1));
+      transform-origin: 0 0;
+      will-change: transform;
+      user-select: none;
+      -webkit-user-drag: none;
     }
 
     .modal-body { padding: 16px; }
@@ -393,16 +392,9 @@
       </div>
       <section id="infoPanel" class="info-panel" hidden>
         <div class="panel-row">
-        <select id="sortMode">
-          <option value="input-asc">原始順序</option>
-          <option value="name-asc">姓名排序</option>
-        </select>
-          <select id="viewScale" aria-label="畫面比例">
-            <option value="0.5">畫面 50%</option>
-            <option value="0.75">畫面 75%</option>
-            <option value="1" selected>畫面 100%</option>
-            <option value="1.25">畫面 125%</option>
-            <option value="1.5">畫面 150%</option>
+          <select id="sortMode">
+            <option value="input-asc">原始順序</option>
+            <option value="name-asc">姓名排序</option>
           </select>
           <label class="check"><input id="showNamesInput" type="checkbox" checked> 顯示人名</label>
           <button id="detailToggle" class="detail-toggle" type="button" aria-expanded="false">展開詳細分類</button>
@@ -413,14 +405,16 @@
       </section>
     </section>
 
-    <div id="scaledContent" class="scaled-content">
+    <div>
       <section id="grid" class="grid" aria-live="polite"></section>
       <div id="empty" class="empty">找不到符合的人物</div>
     </div>
   </main>
 
   <dialog id="dialog">
-    <img id="modalPhoto" class="modal-photo" alt="">
+    <div id="photoStage" class="photo-stage">
+      <img id="modalPhoto" class="modal-photo" alt="">
+    </div>
     <div class="modal-body">
       <div class="modal-head">
         <div>
@@ -445,8 +439,6 @@
     const empty = document.getElementById("empty");
     const search = document.getElementById("search");
     const sortMode = document.getElementById("sortMode");
-    const viewScale = document.getElementById("viewScale");
-    const scaledContent = document.getElementById("scaledContent");
     const panelToggle = document.getElementById("panelToggle");
     const infoPanel = document.getElementById("infoPanel");
     const showNamesInput = document.getElementById("showNamesInput");
@@ -454,6 +446,7 @@
     const detailFilters = document.getElementById("detailFilters");
     const status = document.getElementById("status");
     const dialog = document.getElementById("dialog");
+    const photoStage = document.getElementById("photoStage");
     const modalPhoto = document.getElementById("modalPhoto");
     const modalName = document.getElementById("modalName");
     const modalTitle = document.getElementById("modalTitle");
@@ -463,7 +456,6 @@
     const closeButton = document.getElementById("close");
     let showNames = true;
     let activePersonId = "";
-    const scaleKey = "faceCardsViewScale:v1";
     const notesKey = "faceCardsNotes:v1";
     const savedNotes = (() => {
       try {
@@ -476,13 +468,95 @@
       { key: "detailCategories", label: "類別", values: ["EMBA", "113", "114", "扶輪社"] },
     ];
     const selectedFilters = Object.fromEntries(filterGroups.map((group) => [group.key, new Set()]));
+    const photoPointers = new Map();
+    let photoZoom = { scale: 1, x: 0, y: 0 };
+    let photoGesture = null;
 
-    function applyViewScale(value) {
-      const allowed = ["0.5", "0.75", "1", "1.25", "1.5"];
-      const scale = allowed.includes(value) ? value : "1";
-      viewScale.value = scale;
-      scaledContent.style.setProperty("--view-scale", scale);
-      localStorage.setItem(scaleKey, scale);
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function constrainPhotoZoom(zoom) {
+      if (zoom.scale <= 1) return { scale: 1, x: 0, y: 0 };
+      const stageWidth = photoStage.clientWidth;
+      const stageHeight = photoStage.clientHeight;
+      const imageWidth = modalPhoto.offsetWidth * zoom.scale;
+      const imageHeight = modalPhoto.offsetHeight * zoom.scale;
+      const minX = Math.min(0, stageWidth - imageWidth);
+      const minY = Math.min(0, stageHeight - imageHeight);
+      return {
+        scale: zoom.scale,
+        x: clamp(zoom.x, minX, 0),
+        y: clamp(zoom.y, minY, 0),
+      };
+    }
+
+    function applyPhotoZoom() {
+      photoZoom = constrainPhotoZoom(photoZoom);
+      modalPhoto.style.setProperty("--photo-scale", photoZoom.scale);
+      modalPhoto.style.setProperty("--photo-x", `${photoZoom.x}px`);
+      modalPhoto.style.setProperty("--photo-y", `${photoZoom.y}px`);
+    }
+
+    function resetPhotoZoom() {
+      photoPointers.clear();
+      photoGesture = null;
+      photoZoom = { scale: 1, x: 0, y: 0 };
+      applyPhotoZoom();
+    }
+
+    function stagePoint(event) {
+      const rect = photoStage.getBoundingClientRect();
+      return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    }
+
+    function pointerList() {
+      return [...photoPointers.values()];
+    }
+
+    function distance(a, b) {
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    }
+
+    function midpoint(a, b) {
+      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    }
+
+    function startPhotoGesture() {
+      const points = pointerList();
+      if (points.length === 1) {
+        photoGesture = { mode: "pan", start: points[0], base: { ...photoZoom } };
+      } else if (points.length >= 2) {
+        photoGesture = {
+          mode: "pinch",
+          startDistance: distance(points[0], points[1]) || 1,
+          startCenter: midpoint(points[0], points[1]),
+          base: { ...photoZoom },
+        };
+      }
+    }
+
+    function updatePhotoGesture() {
+      const points = pointerList();
+      if (!photoGesture || !points.length) return;
+      if (photoGesture.mode === "pan" && points.length === 1 && photoZoom.scale > 1) {
+        photoZoom = {
+          scale: photoGesture.base.scale,
+          x: photoGesture.base.x + points[0].x - photoGesture.start.x,
+          y: photoGesture.base.y + points[0].y - photoGesture.start.y,
+        };
+        applyPhotoZoom();
+      } else if (photoGesture.mode === "pinch" && points.length >= 2) {
+        const center = midpoint(points[0], points[1]);
+        const nextScale = clamp(photoGesture.base.scale * (distance(points[0], points[1]) / photoGesture.startDistance), 1, 5);
+        const ratio = nextScale / photoGesture.base.scale;
+        photoZoom = {
+          scale: nextScale,
+          x: center.x - (photoGesture.startCenter.x - photoGesture.base.x) * ratio,
+          y: center.y - (photoGesture.startCenter.y - photoGesture.base.y) * ratio,
+        };
+        applyPhotoZoom();
+      }
     }
 
     function searchable(person) {
@@ -567,6 +641,7 @@
 
     function show(person) {
       activePersonId = person.id;
+      resetPhotoZoom();
       modalPhoto.src = person.imageData;
       modalPhoto.alt = person.name;
       modalName.textContent = person.name;
@@ -604,7 +679,6 @@
     });
     search.addEventListener("input", render);
     sortMode.addEventListener("change", render);
-    viewScale.addEventListener("change", () => applyViewScale(viewScale.value));
     panelToggle.addEventListener("click", () => {
       const willOpen = infoPanel.hidden;
       infoPanel.hidden = !willOpen;
@@ -634,9 +708,29 @@
       else selectedFilters[key].delete(event.target.value);
       render();
     });
+    photoStage.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      photoStage.setPointerCapture(event.pointerId);
+      photoPointers.set(event.pointerId, stagePoint(event));
+      startPhotoGesture();
+    });
+    photoStage.addEventListener("pointermove", (event) => {
+      if (!photoPointers.has(event.pointerId)) return;
+      event.preventDefault();
+      photoPointers.set(event.pointerId, stagePoint(event));
+      updatePhotoGesture();
+    });
+    photoStage.addEventListener("pointerup", (event) => {
+      photoPointers.delete(event.pointerId);
+      startPhotoGesture();
+    });
+    photoStage.addEventListener("pointercancel", (event) => {
+      photoPointers.delete(event.pointerId);
+      startPhotoGesture();
+    });
+    photoStage.addEventListener("dblclick", resetPhotoZoom);
 
     renderDetailFilters();
-    applyViewScale(localStorage.getItem(scaleKey) || "1");
     render();
   </script>
 </body>
