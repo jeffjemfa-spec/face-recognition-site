@@ -500,6 +500,7 @@
     let cardZoom = { scale: 1, x: 0, y: 0 };
     let cardGesture = null;
     let cardGestureMoved = false;
+    let cardLayoutFrame = 0;
 
     function clamp(value, min, max) {
       return Math.min(max, Math.max(min, value));
@@ -652,6 +653,17 @@
       cardGesture = null;
       cardZoom = { scale, x: 0, y: 0 };
       applyCardZoom();
+    }
+
+    function refreshCardLayout() {
+      if (cardLayoutFrame) cancelAnimationFrame(cardLayoutFrame);
+      cardLayoutFrame = requestAnimationFrame(() => {
+        cardLayoutFrame = 0;
+        cardPointers.clear();
+        cardGesture = null;
+        cardZoom = { ...cardZoom, x: 0, y: 0 };
+        applyCardZoom();
+      });
     }
 
     function cardPoint(event) {
@@ -880,6 +892,11 @@
       startCardGesture();
     });
     cardStage.addEventListener("dblclick", resetCardZoom);
+    window.addEventListener("resize", refreshCardLayout);
+    window.addEventListener("orientationchange", () => {
+      refreshCardLayout();
+      setTimeout(refreshCardLayout, 250);
+    });
     photoStage.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       photoStage.setPointerCapture(event.pointerId);
