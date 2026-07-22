@@ -501,6 +501,7 @@
     let cardGesture = null;
     let cardGestureMoved = false;
     let cardLayoutFrame = 0;
+    let suppressCardClickUntil = 0;
 
     function clamp(value, min, max) {
       return Math.min(max, Math.max(min, value));
@@ -818,6 +819,11 @@
     }
 
     grid.addEventListener("click", (event) => {
+      if (Date.now() < suppressCardClickUntil) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       if (cardGestureMoved) {
         cardGestureMoved = false;
         return;
@@ -913,6 +919,7 @@
     photoStage.addEventListener("pointerup", (event) => {
       photoPointers.delete(event.pointerId);
       if (!photoPointers.size && !photoGestureMoved) {
+        suppressCardClickUntil = Date.now() + 500;
         dialog.close();
         return;
       }
