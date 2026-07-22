@@ -337,6 +337,12 @@
       -webkit-overflow-scrolling: touch;
     }
 
+    .modal-body::after {
+      content: "";
+      display: block;
+      height: max(88px, env(safe-area-inset-bottom));
+    }
+
     .modal-head {
       display: flex;
       justify-content: space-between;
