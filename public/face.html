@@ -355,6 +355,11 @@
       align-items: flex-start;
     }
 
+    .modal-head > div {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
     .modal-name {
       display: block;
       width: 100%;
@@ -397,6 +402,8 @@
       background: transparent;
       font-size: 16px;
       line-height: 1.35;
+      overflow: hidden;
+      resize: none;
     }
 
     .info-lines-input {
@@ -505,7 +512,7 @@
       <div class="modal-head">
         <div>
           <input id="modalName" class="modal-name modal-input" type="text" autocomplete="off" aria-label="姓名">
-          <input id="modalTitle" class="title modal-input" type="text" autocomplete="off" aria-label="職稱">
+          <textarea id="modalTitle" class="title modal-input" rows="1" autocomplete="off" aria-label="職稱"></textarea>
         </div>
         <button class="close" id="close" type="button" aria-label="關閉" autofocus>×</button>
       </div>
@@ -900,9 +907,18 @@
       if (typeof field.setSelectionRange === "function") field.setSelectionRange(end, end);
     }
 
+    function fitTextAreaHeight(field) {
+      field.style.height = "auto";
+      field.style.height = `${field.scrollHeight}px`;
+    }
+
+    function fitEditableTextHeights() {
+      fitTextAreaHeight(modalTitle);
+      fitTextAreaHeight(modalInfoLines);
+    }
+
     function fitInfoLinesHeight() {
-      modalInfoLines.style.height = "auto";
-      modalInfoLines.style.height = `${modalInfoLines.scrollHeight}px`;
+      fitEditableTextHeights();
     }
 
     function fitInfoLinesAfterPaint() {
@@ -986,7 +1002,10 @@
       localStorage.setItem(notesKey, JSON.stringify(savedNotes));
     });
     modalName.addEventListener("input", saveActivePersonEdits);
-    modalTitle.addEventListener("input", saveActivePersonEdits);
+    modalTitle.addEventListener("input", () => {
+      fitEditableTextHeights();
+      saveActivePersonEdits();
+    });
     modalInfoLines.addEventListener("input", () => {
       fitInfoLinesHeight();
       saveActivePersonEdits();
