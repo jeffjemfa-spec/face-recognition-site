@@ -226,6 +226,7 @@
       opacity: .92;
       transform: translate3d(var(--drag-x, 0px), var(--drag-y, 0px), 0) scale(1.03);
       box-shadow: 0 18px 46px rgba(21, 31, 43, .28);
+      transition: none;
       will-change: transform;
     }
 
@@ -1186,6 +1187,55 @@
       };
     }
 
+    function gridOrderFromDom() {
+      return [...grid.querySelectorAll(".person")].map((button) => button.dataset.id).filter(Boolean);
+    }
+
+    function gridRects() {
+      return new Map([...grid.querySelectorAll(".person")].map((button) => [
+        button.dataset.id,
+        button.getBoundingClientRect(),
+      ]));
+    }
+
+    function animateGridShift(beforeRects) {
+      const moving = [...grid.querySelectorAll(".person:not(.is-dragging)")];
+      for (const button of moving) {
+        const before = beforeRects.get(button.dataset.id);
+        if (!before) continue;
+        const after = button.getBoundingClientRect();
+        const dx = before.left - after.left;
+        const dy = before.top - after.top;
+        if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+        button.style.transition = "none";
+        button.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+      }
+      requestAnimationFrame(() => {
+        for (const button of moving) {
+          if (!button.style.transform) continue;
+          button.style.transition = "transform .16s ease, opacity .14s ease, box-shadow .14s ease";
+          button.style.transform = "";
+        }
+      });
+    }
+
+    function previewCardDrop(target) {
+      if (!dragState || !target || target.dataset.id === dragState.id) return;
+      const source = grid.querySelector(personSelector(dragState.id));
+      if (!source || source === target) return;
+      const cards = [...grid.querySelectorAll(".person")];
+      const sourceIndex = cards.indexOf(source);
+      const targetIndex = cards.indexOf(target);
+      const reference = targetIndex > sourceIndex ? target.nextElementSibling : target;
+      if (source.nextElementSibling === reference) return;
+      const before = gridRects();
+      grid.insertBefore(source, reference);
+      dragState.targetId = target.dataset.id;
+      clearCardDropTargets();
+      target.classList.add("is-drop-target");
+      animateGridShift(before);
+    }
+
     function beginFloatingCardDrag() {
       if (!dragState || dragState.dragging) return;
       if (dragState.holdTimer) {
@@ -1245,11 +1295,7 @@
       event.preventDefault();
       moveDragGhost(dragState, event.clientX, event.clientY);
       const target = document.elementFromPoint(event.clientX, event.clientY)?.closest(".person");
-      clearCardDropTargets();
-      if (target && target.dataset.id !== dragState.id) {
-        dragState.targetId = target.dataset.id;
-        target.classList.add("is-drop-target");
-      }
+      previewCardDrop(target);
     }
 
     function finishCardDrag(event) {
@@ -1261,8 +1307,12 @@
           grid.releasePointerCapture(event.pointerId);
         } catch {}
       }
-      if (didDrag && reorderCustomOrder(state.id, state.targetId)) render();
+      if (didDrag) {
+        customOrder = gridOrderFromDom();
+        saveCustomOrder();
+      }
       clearCardDragState();
+      if (didDrag) render();
       if (didDrag) {
         cardGestureMoved = true;
         suppressCardClickUntil = Date.now() + 350;
