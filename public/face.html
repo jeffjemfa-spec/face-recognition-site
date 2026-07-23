@@ -395,6 +395,8 @@
       padding: 0;
       border: 0;
       background: transparent;
+      font-size: 16px;
+      line-height: 1.35;
     }
 
     .info-lines-input {
@@ -407,7 +409,7 @@
       background: transparent;
       color: var(--muted);
       font: inherit;
-      font-size: 13px;
+      font-size: 16px;
       line-height: 1.35;
       resize: vertical;
     }
@@ -504,7 +506,7 @@
           <input id="modalName" class="modal-name modal-input" type="text" autocomplete="off" aria-label="姓名">
           <input id="modalTitle" class="title modal-input" type="text" autocomplete="off" aria-label="職稱">
         </div>
-        <button class="close" id="close" type="button" aria-label="關閉">×</button>
+        <button class="close" id="close" type="button" aria-label="關閉" autofocus>×</button>
       </div>
       <textarea id="modalInfoLines" class="info-lines-input" autocomplete="off" aria-label="詳細資料"></textarea>
       <div class="notes">
@@ -881,15 +883,17 @@
 
     function lockEditFields() {
       editableFields().forEach((field) => {
-        field.readOnly = true;
         field.classList.remove("is-editing");
       });
     }
 
     function unlockEditField(field) {
       if (!activePersonId) return;
-      field.readOnly = false;
       field.classList.add("is-editing");
+    }
+
+    function focusEditField(field) {
+      unlockEditField(field);
       field.focus({ preventScroll: true });
       const end = field.value.length;
       if (typeof field.setSelectionRange === "function") field.setSelectionRange(end, end);
@@ -941,6 +945,7 @@
         modalInfoImage.style.display = "none";
       }
       dialog.showModal();
+      requestAnimationFrame(() => closeButton.focus({ preventScroll: true }));
     }
 
     grid.addEventListener("click", (event) => {
@@ -970,9 +975,10 @@
     modalTitle.addEventListener("input", saveActivePersonEdits);
     modalInfoLines.addEventListener("input", saveActivePersonEdits);
     editableFields().forEach((field) => {
-      field.addEventListener("click", () => unlockEditField(field));
+      field.addEventListener("pointerdown", () => unlockEditField(field));
+      field.addEventListener("touchstart", () => unlockEditField(field), { passive: true });
+      field.addEventListener("click", () => focusEditField(field));
       field.addEventListener("blur", () => {
-        field.readOnly = true;
         field.classList.remove("is-editing");
       });
     });
