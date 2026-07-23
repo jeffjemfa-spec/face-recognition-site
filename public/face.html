@@ -216,6 +216,8 @@
 
     .drag-ghost {
       position: fixed;
+      top: 0;
+      left: 0;
       z-index: 9999;
       margin: 0;
       pointer-events: none;
@@ -1215,7 +1217,11 @@
           source.classList.add("is-dragging");
           moveDragGhost(dragState, event.clientX, event.clientY);
         }
-        if (typeof grid.setPointerCapture === "function") grid.setPointerCapture(event.pointerId);
+        if (typeof grid.setPointerCapture === "function") {
+          try {
+            grid.setPointerCapture(event.pointerId);
+          } catch {}
+        }
       }
       if (!dragState.dragging) return;
       event.preventDefault();
