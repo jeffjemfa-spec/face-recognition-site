@@ -905,6 +905,13 @@
       modalInfoLines.style.height = `${modalInfoLines.scrollHeight}px`;
     }
 
+    function fitInfoLinesAfterPaint() {
+      requestAnimationFrame(() => {
+        fitInfoLinesHeight();
+        requestAnimationFrame(fitInfoLinesHeight);
+      });
+    }
+
     function filteredPeople() {
       const q = search.value.trim().toLowerCase();
       let rows = people.filter((person) => {
@@ -941,7 +948,6 @@
       modalTitle.value = person.title || "";
       modalInfoLines.value = (person.infoLines || []).join("\n");
       lockEditFields();
-      fitInfoLinesHeight();
       modalNotes.value = savedNotes[person.id] || "";
       if (person.infoImageData) {
         modalInfoImage.src = person.infoImageData;
@@ -952,6 +958,7 @@
         modalInfoImage.style.display = "none";
       }
       dialog.showModal();
+      fitInfoLinesAfterPaint();
       requestAnimationFrame(() => closeButton.focus({ preventScroll: true }));
     }
 
@@ -998,6 +1005,9 @@
     });
     search.addEventListener("input", render);
     sortMode.addEventListener("change", render);
+    window.addEventListener("resize", () => {
+      if (dialog.open) fitInfoLinesAfterPaint();
+    });
     cardScale.addEventListener("change", () => setCardScale(cardScale.value));
     panelToggle.addEventListener("click", () => {
       const willOpen = infoPanel.hidden;
