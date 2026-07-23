@@ -298,9 +298,17 @@
       color: var(--ink);
       box-shadow: var(--shadow);
       flex-direction: column;
+      overscroll-behavior: contain;
     }
 
     dialog[open] { display: flex; }
+
+    html.dialog-lock,
+    body.dialog-lock {
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
 
     dialog::backdrop {
       background: rgba(20, 26, 32, .58);
@@ -339,6 +347,7 @@
       padding: 16px;
       overflow-y: auto;
       overscroll-behavior: contain;
+      touch-action: pan-y;
       -webkit-overflow-scrolling: touch;
     }
 
@@ -551,6 +560,8 @@
     const closeButton = document.getElementById("close");
     let showNames = true;
     let activePersonId = "";
+    let lockedScrollY = 0;
+    let modalTouchStartY = 0;
     const notesKey = "faceCardsNotes:v1";
     const editsKey = "faceCardsPersonEdits:v1";
     const savedNotes = (() => {
@@ -973,9 +984,52 @@
         modalInfoImage.removeAttribute("src");
         modalInfoImage.style.display = "none";
       }
+      lockPageScroll();
       dialog.showModal();
       fitInfoLinesAfterPaint();
       requestAnimationFrame(() => closeButton.focus({ preventScroll: true }));
+    }
+
+    function lockPageScroll() {
+      if (document.body.classList.contains("dialog-lock")) return;
+      lockedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      document.documentElement.classList.add("dialog-lock");
+      document.body.classList.add("dialog-lock");
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${lockedScrollY}px`;
+      document.body.style.left = "0";
+      document.body.style.right = "0";
+      document.body.style.width = "100%";
+    }
+
+    function unlockPageScroll() {
+      if (!document.body.classList.contains("dialog-lock")) return;
+      document.documentElement.classList.remove("dialog-lock");
+      document.body.classList.remove("dialog-lock");
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.left = "";
+      document.body.style.right = "";
+      document.body.style.width = "";
+      window.scrollTo(0, lockedScrollY);
+    }
+
+    function handleDialogTouchStart(event) {
+      if (!dialog.open || event.touches.length !== 1) return;
+      modalTouchStartY = event.touches[0].clientY;
+    }
+
+    function handleDialogTouchMove(event) {
+      if (!dialog.open || event.touches.length !== 1) return;
+      const scrollArea = event.target.closest(".modal-body");
+      if (!scrollArea) {
+        event.preventDefault();
+        return;
+      }
+      const deltaY = event.touches[0].clientY - modalTouchStartY;
+      const atTop = scrollArea.scrollTop <= 0;
+      const atBottom = Math.ceil(scrollArea.scrollTop + scrollArea.clientHeight) >= scrollArea.scrollHeight;
+      if ((atTop && deltaY > 0) || (atBottom && deltaY < 0)) event.preventDefault();
     }
 
     grid.addEventListener("click", (event) => {
@@ -1022,6 +1076,9 @@
     dialog.addEventListener("click", (event) => {
       if (event.target === dialog) dialog.close();
     });
+    dialog.addEventListener("close", unlockPageScroll);
+    dialog.addEventListener("touchstart", handleDialogTouchStart, { passive: true });
+    dialog.addEventListener("touchmove", handleDialogTouchMove, { passive: false });
     search.addEventListener("input", render);
     sortMode.addEventListener("change", render);
     window.addEventListener("resize", () => {
