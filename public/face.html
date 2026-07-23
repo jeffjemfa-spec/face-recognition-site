@@ -237,7 +237,7 @@
     }
 
     .notes {
-      margin-top: 12px;
+      margin-top: 18px;
     }
 
     .notes-label {
@@ -411,7 +411,8 @@
       font: inherit;
       font-size: 16px;
       line-height: 1.35;
-      resize: vertical;
+      overflow: hidden;
+      resize: none;
     }
 
     .close {
@@ -899,6 +900,11 @@
       if (typeof field.setSelectionRange === "function") field.setSelectionRange(end, end);
     }
 
+    function fitInfoLinesHeight() {
+      modalInfoLines.style.height = "auto";
+      modalInfoLines.style.height = `${modalInfoLines.scrollHeight}px`;
+    }
+
     function filteredPeople() {
       const q = search.value.trim().toLowerCase();
       let rows = people.filter((person) => {
@@ -935,6 +941,7 @@
       modalTitle.value = person.title || "";
       modalInfoLines.value = (person.infoLines || []).join("\n");
       lockEditFields();
+      fitInfoLinesHeight();
       modalNotes.value = savedNotes[person.id] || "";
       if (person.infoImageData) {
         modalInfoImage.src = person.infoImageData;
@@ -973,7 +980,10 @@
     });
     modalName.addEventListener("input", saveActivePersonEdits);
     modalTitle.addEventListener("input", saveActivePersonEdits);
-    modalInfoLines.addEventListener("input", saveActivePersonEdits);
+    modalInfoLines.addEventListener("input", () => {
+      fitInfoLinesHeight();
+      saveActivePersonEdits();
+    });
     editableFields().forEach((field) => {
       field.addEventListener("pointerdown", () => unlockEditField(field));
       field.addEventListener("touchstart", () => unlockEditField(field), { passive: true });
