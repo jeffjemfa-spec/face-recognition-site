@@ -1198,6 +1198,14 @@
       ]));
     }
 
+    function clearGridShiftStyles() {
+      for (const button of grid.querySelectorAll(".person:not(.is-dragging)")) {
+        button.style.transition = "none";
+        button.style.transform = "";
+      }
+      grid.getBoundingClientRect();
+    }
+
     function animateGridShift(beforeRects) {
       const moving = [...grid.querySelectorAll(".person:not(.is-dragging)")];
       for (const button of moving) {
@@ -1213,7 +1221,7 @@
       requestAnimationFrame(() => {
         for (const button of moving) {
           if (!button.style.transform) continue;
-          button.style.transition = "transform .16s ease, opacity .14s ease, box-shadow .14s ease";
+          button.style.transition = "transform .28s cubic-bezier(.2, .7, .2, 1), opacity .14s ease, box-shadow .14s ease";
           button.style.transform = "";
         }
       });
@@ -1229,6 +1237,7 @@
       const reference = targetIndex > sourceIndex ? target.nextElementSibling : target;
       if (source.nextElementSibling === reference) return;
       const before = gridRects();
+      clearGridShiftStyles();
       grid.insertBefore(source, reference);
       dragState.targetId = target.dataset.id;
       clearCardDropTargets();
