@@ -200,6 +200,8 @@
       cursor: pointer;
       touch-action: none;
       user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
       transition: opacity .14s ease, transform .14s ease, box-shadow .14s ease;
     }
 
@@ -233,6 +235,9 @@
       height: auto;
       object-fit: contain;
       background: #f8fafb;
+      user-select: none;
+      -webkit-user-drag: none;
+      -webkit-touch-callout: none;
     }
 
     .meta {
@@ -639,6 +644,7 @@
     let cardGestureMoved = false;
     let cardLayoutFrame = 0;
     let suppressCardClickUntil = 0;
+    const dragHoldDelay = 180;
 
     applySavedEdits();
 
@@ -1136,6 +1142,7 @@
 
     function clearCardDragState() {
       if (!dragState) return;
+      if (dragState.holdTimer) clearTimeout(dragState.holdTimer);
       const source = grid.querySelector(personSelector(dragState.id));
       if (source) source.classList.remove("is-dragging");
       if (dragState.ghost) dragState.ghost.remove();
@@ -1164,7 +1171,7 @@
       state.ghost.style.setProperty("--drag-y", `${y - state.offsetY}px`);
     }
 
-    function makeDragGhost(button, event) {
+    function makeDragGhost(button, x, y) {
       const rect = button.getBoundingClientRect();
       const ghost = button.cloneNode(true);
       ghost.classList.remove("is-dragging", "is-drop-target");
@@ -1174,9 +1181,37 @@
       document.body.appendChild(ghost);
       return {
         ghost,
-        offsetX: event.clientX - rect.left,
-        offsetY: event.clientY - rect.top,
+        offsetX: x - rect.left,
+        offsetY: y - rect.top,
       };
+    }
+
+    function beginFloatingCardDrag() {
+      if (!dragState || dragState.dragging) return;
+      if (dragState.holdTimer) {
+        clearTimeout(dragState.holdTimer);
+        dragState.holdTimer = 0;
+      }
+      const source = grid.querySelector(personSelector(dragState.id));
+      if (!source) return;
+      dragState.dragging = true;
+      cardGestureMoved = true;
+      cardPointers.delete(dragState.pointerId);
+      cardGesture = null;
+      captureCurrentOrderAsCustom();
+      sortMode.value = "custom";
+      sortDirection.value = "asc";
+      const ghost = makeDragGhost(source, dragState.currentX, dragState.currentY);
+      dragState.ghost = ghost.ghost;
+      dragState.offsetX = ghost.offsetX;
+      dragState.offsetY = ghost.offsetY;
+      source.classList.add("is-dragging");
+      moveDragGhost(dragState, dragState.currentX, dragState.currentY);
+      if (typeof grid.setPointerCapture === "function") {
+        try {
+          grid.setPointerCapture(dragState.pointerId);
+        } catch {}
+      }
     }
 
     function startCardDrag(event) {
@@ -1193,36 +1228,19 @@
         targetId: button.dataset.id,
         startX: event.clientX,
         startY: event.clientY,
+        currentX: event.clientX,
+        currentY: event.clientY,
         dragging: false,
       };
+      dragState.holdTimer = setTimeout(beginFloatingCardDrag, dragHoldDelay);
     }
 
     function moveCardDrag(event) {
       if (!dragState || dragState.pointerId !== event.pointerId) return;
+      dragState.currentX = event.clientX;
+      dragState.currentY = event.clientY;
       const moved = Math.hypot(event.clientX - dragState.startX, event.clientY - dragState.startY);
-      if (!dragState.dragging && moved > 8) {
-        dragState.dragging = true;
-        cardGestureMoved = true;
-        cardPointers.delete(event.pointerId);
-        cardGesture = null;
-        captureCurrentOrderAsCustom();
-        sortMode.value = "custom";
-        sortDirection.value = "asc";
-        const source = grid.querySelector(personSelector(dragState.id));
-        if (source) {
-          const ghost = makeDragGhost(source, event);
-          dragState.ghost = ghost.ghost;
-          dragState.offsetX = ghost.offsetX;
-          dragState.offsetY = ghost.offsetY;
-          source.classList.add("is-dragging");
-          moveDragGhost(dragState, event.clientX, event.clientY);
-        }
-        if (typeof grid.setPointerCapture === "function") {
-          try {
-            grid.setPointerCapture(event.pointerId);
-          } catch {}
-        }
-      }
+      if (!dragState.dragging && moved > 8) beginFloatingCardDrag();
       if (!dragState.dragging) return;
       event.preventDefault();
       moveDragGhost(dragState, event.clientX, event.clientY);
