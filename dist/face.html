@@ -644,6 +644,7 @@
     let cardGesture = null;
     let cardGestureMoved = false;
     let cardLayoutFrame = 0;
+    let gridShiftFrame = 0;
     let suppressCardClickUntil = 0;
     const dragHoldDelay = 180;
 
@@ -1198,12 +1199,18 @@
       ]));
     }
 
-    function clearGridShiftStyles() {
+    function prepareGridShift() {
+      if (gridShiftFrame) {
+        cancelAnimationFrame(gridShiftFrame);
+        gridShiftFrame = 0;
+      }
+      const before = gridRects();
       for (const button of grid.querySelectorAll(".person:not(.is-dragging)")) {
         button.style.transition = "none";
         button.style.transform = "";
       }
       grid.getBoundingClientRect();
+      return before;
     }
 
     function animateGridShift(beforeRects) {
@@ -1218,7 +1225,8 @@
         button.style.transition = "none";
         button.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
       }
-      requestAnimationFrame(() => {
+      gridShiftFrame = requestAnimationFrame(() => {
+        gridShiftFrame = 0;
         for (const button of moving) {
           if (!button.style.transform) continue;
           button.style.transition = "transform .28s cubic-bezier(.2, .7, .2, 1), opacity .14s ease, box-shadow .14s ease";
@@ -1236,8 +1244,7 @@
       const targetIndex = cards.indexOf(target);
       const reference = targetIndex > sourceIndex ? target.nextElementSibling : target;
       if (source.nextElementSibling === reference) return;
-      const before = gridRects();
-      clearGridShiftStyles();
+      const before = prepareGridShift();
       grid.insertBefore(source, reference);
       dragState.targetId = target.dataset.id;
       clearCardDropTargets();
