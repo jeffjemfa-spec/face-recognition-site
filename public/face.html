@@ -185,6 +185,7 @@
     }
 
     .person {
+      position: relative;
       display: block;
       min-width: 0;
       height: auto;
@@ -197,6 +198,20 @@
       box-shadow: 0 8px 22px rgba(21, 31, 43, .08);
       text-align: left;
       cursor: pointer;
+      touch-action: none;
+      user-select: none;
+      transition: opacity .14s ease, transform .14s ease, box-shadow .14s ease;
+    }
+
+    .person.is-dragging {
+      opacity: .38;
+      transform: scale(.98);
+      box-shadow: none;
+    }
+
+    .person.is-drop-target {
+      outline: 3px solid rgba(11, 127, 114, .36);
+      outline-offset: 3px;
     }
 
     .photo {
@@ -488,9 +503,14 @@
       <section id="infoPanel" class="info-panel" hidden>
         <div class="panel-row">
           <input id="search" class="search-input" type="search" placeholder="搜尋姓名、班別、公司、類別" autocomplete="off">
-          <select id="sortMode">
-            <option value="input-asc">原始順序</option>
-            <option value="name-asc">姓名排序</option>
+          <select id="sortMode" aria-label="排序依據">
+            <option value="custom" selected>自行排列</option>
+            <option value="name">依照名字</option>
+            <option value="modified">依修改日期</option>
+          </select>
+          <select id="sortDirection" aria-label="排序方向">
+            <option value="asc" selected>小到大</option>
+            <option value="desc">大到小</option>
           </select>
           <select id="cardScale" aria-label="照片縮放">
             <option value="0.5">照片 50%</option>
@@ -544,6 +564,7 @@
     const cardStage = document.getElementById("cardStage");
     const search = document.getElementById("search");
     const sortMode = document.getElementById("sortMode");
+    const sortDirection = document.getElementById("sortDirection");
     const cardScale = document.getElementById("cardScale");
     const panelToggle = document.getElementById("panelToggle");
     const infoPanel = document.getElementById("infoPanel");
@@ -564,8 +585,10 @@
     let activePersonId = "";
     let lockedScrollY = 0;
     let modalTouchStartY = 0;
+    let dragState = null;
     const notesKey = "faceCardsNotes:v1";
     const editsKey = "faceCardsPersonEdits:v1";
+    const orderKey = "faceCardsCustomOrder:v1";
     const savedNotes = (() => {
       try {
         return JSON.parse(localStorage.getItem(notesKey) || "{}");
@@ -579,6 +602,14 @@
         return parsed && typeof parsed === "object" ? parsed : {};
       } catch {
         return {};
+      }
+    })();
+    let customOrder = (() => {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(orderKey) || "[]");
+        return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : [];
+      } catch {
+        return [];
       }
     })();
     const filterGroups = [
@@ -849,7 +880,7 @@
 
     function card(person) {
       return `
-        <button class="person" type="button" data-id="${esc(person.id)}">
+        <button class="person" type="button" data-id="${esc(person.id)}" aria-label="${esc(person.name)}，可拖曳調整順序">
           <img class="photo" src="${person.imageData}" alt="${esc(person.name)}">
           ${showNames ? `<div class="meta">
             <div class="name">${esc(person.name)}</div>
@@ -864,6 +895,10 @@
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;");
+    }
+
+    function personSelector(id) {
+      return `.person[data-id="${String(id || "").replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"]`;
     }
 
     function splitLines(value) {
@@ -891,6 +926,7 @@
         name: person.name,
         title: person.title,
         infoLines: person.infoLines,
+        modifiedAt: Date.now(),
       };
       localStorage.setItem(editsKey, JSON.stringify(savedEdits));
       modalPhoto.alt = person.name;
@@ -941,6 +977,52 @@
       });
     }
 
+    function normalizedCustomOrder() {
+      const ids = new Set(people.map((person) => person.id));
+      const ordered = customOrder.filter((id) => ids.has(id));
+      for (const person of [...people].sort((a, b) => (a.inputOrder || 0) - (b.inputOrder || 0))) {
+        if (!ordered.includes(person.id)) ordered.push(person.id);
+      }
+      customOrder = ordered;
+      return ordered;
+    }
+
+    function saveCustomOrder() {
+      normalizedCustomOrder();
+      localStorage.setItem(orderKey, JSON.stringify(customOrder));
+    }
+
+    function customOrderIndex(person) {
+      const index = normalizedCustomOrder().indexOf(person.id);
+      return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+    }
+
+    function modifiedTime(person) {
+      const edit = savedEdits[person.id];
+      if (edit && Number.isFinite(edit.modifiedAt)) return edit.modifiedAt;
+      if (Number.isFinite(person.modifiedAt)) return person.modifiedAt;
+      return Number(person.inputOrder || 0);
+    }
+
+    function sortRows(rows) {
+      const direction = sortDirection.value === "desc" ? -1 : 1;
+      const mode = sortMode.value;
+      const sorted = [...rows];
+      if (mode === "name") {
+        sorted.sort((a, b) => direction * a.name.localeCompare(b.name, "zh-Hant"));
+      } else if (mode === "modified") {
+        sorted.sort((a, b) => direction * (modifiedTime(a) - modifiedTime(b)));
+      } else {
+        sorted.sort((a, b) => direction * (customOrderIndex(a) - customOrderIndex(b)));
+      }
+      return sorted;
+    }
+
+    function captureCurrentOrderAsCustom() {
+      customOrder = sortRows([...people]).map((person) => person.id);
+      saveCustomOrder();
+    }
+
     function filteredPeople() {
       const q = search.value.trim().toLowerCase();
       let rows = people.filter((person) => {
@@ -952,10 +1034,7 @@
         });
         return matchesText && matchesDetails;
       });
-      if (sortMode.value === "name-asc") {
-        rows = [...rows].sort((a, b) => a.name.localeCompare(b.name, "zh-Hant"));
-      }
-      return rows;
+      return sortRows(rows);
     }
 
     function render() {
@@ -964,7 +1043,9 @@
       empty.style.display = rows.length ? "none" : "block";
       const selectedCount = filterGroups.reduce((total, group) => total + selectedFilters[group.key].size, 0);
       const detailText = selectedCount ? `，詳細分類 ${selectedCount} 項` : "";
-      status.textContent = `已載入 ${people.length} 筆，目前顯示 ${rows.length} 筆，${showNames ? "顯示名字" : "隱藏名字"}${detailText}`;
+      const sortText = sortMode.value === "custom" ? "自行排列" : sortMode.value === "name" ? "依名字" : "依修改日期";
+      const directionText = sortDirection.value === "desc" ? "大到小" : "小到大";
+      status.textContent = `已載入 ${people.length} 筆，目前顯示 ${rows.length} 筆，${showNames ? "顯示名字" : "隱藏名字"}，${sortText}${directionText}${detailText}`;
       applyCardZoom();
     }
 
@@ -1034,6 +1115,99 @@
       if ((atTop && deltaY > 0) || (atBottom && deltaY < 0)) event.preventDefault();
     }
 
+    function clearCardDropTargets() {
+      grid.querySelectorAll(".person.is-drop-target").forEach((button) => {
+        button.classList.remove("is-drop-target");
+      });
+    }
+
+    function clearCardDragState() {
+      if (!dragState) return;
+      const source = grid.querySelector(personSelector(dragState.id));
+      if (source) source.classList.remove("is-dragging");
+      clearCardDropTargets();
+      dragState = null;
+    }
+
+    function reorderCustomOrder(dragId, targetId) {
+      if (!dragId || !targetId || dragId === targetId) return false;
+      normalizedCustomOrder();
+      const nextOrder = [...customOrder];
+      const from = nextOrder.indexOf(dragId);
+      const to = nextOrder.indexOf(targetId);
+      if (from === -1 || to === -1) return false;
+      nextOrder.splice(from, 1);
+      nextOrder.splice(to, 0, dragId);
+      customOrder = nextOrder;
+      saveCustomOrder();
+      return true;
+    }
+
+    function startCardDrag(event) {
+      const button = event.target.closest(".person");
+      if (!button || dialog.open || (event.button && event.button !== 0)) return;
+      event.stopPropagation();
+      if (typeof grid.setPointerCapture === "function") grid.setPointerCapture(event.pointerId);
+      dragState = {
+        pointerId: event.pointerId,
+        id: button.dataset.id,
+        targetId: button.dataset.id,
+        startX: event.clientX,
+        startY: event.clientY,
+        dragging: false,
+      };
+    }
+
+    function moveCardDrag(event) {
+      if (!dragState || dragState.pointerId !== event.pointerId) return;
+      const moved = Math.hypot(event.clientX - dragState.startX, event.clientY - dragState.startY);
+      if (!dragState.dragging && moved > 8) {
+        dragState.dragging = true;
+        cardGestureMoved = true;
+        captureCurrentOrderAsCustom();
+        sortMode.value = "custom";
+        sortDirection.value = "asc";
+        const source = grid.querySelector(personSelector(dragState.id));
+        if (source) source.classList.add("is-dragging");
+      }
+      if (!dragState.dragging) return;
+      event.preventDefault();
+      const target = document.elementFromPoint(event.clientX, event.clientY)?.closest(".person");
+      clearCardDropTargets();
+      if (target && target.dataset.id !== dragState.id) {
+        dragState.targetId = target.dataset.id;
+        target.classList.add("is-drop-target");
+      }
+    }
+
+    function finishCardDrag(event) {
+      if (!dragState || dragState.pointerId !== event.pointerId) return;
+      const state = dragState;
+      const didDrag = state.dragging;
+      if (typeof grid.releasePointerCapture === "function") {
+        try {
+          grid.releasePointerCapture(event.pointerId);
+        } catch {}
+      }
+      if (didDrag && reorderCustomOrder(state.id, state.targetId)) render();
+      clearCardDragState();
+      if (didDrag) {
+        cardGestureMoved = true;
+        suppressCardClickUntil = Date.now() + 350;
+      }
+    }
+
+    function cancelCardDrag(event) {
+      if (!dragState || dragState.pointerId !== event.pointerId) return;
+      clearCardDragState();
+      cardGestureMoved = true;
+      suppressCardClickUntil = Date.now() + 250;
+    }
+
+    grid.addEventListener("pointerdown", startCardDrag);
+    grid.addEventListener("pointermove", moveCardDrag);
+    grid.addEventListener("pointerup", finishCardDrag);
+    grid.addEventListener("pointercancel", cancelCardDrag);
     grid.addEventListener("click", (event) => {
       if (Date.now() < suppressCardClickUntil) {
         event.preventDefault();
@@ -1083,6 +1257,7 @@
     dialog.addEventListener("touchmove", handleDialogTouchMove, { passive: false });
     search.addEventListener("input", render);
     sortMode.addEventListener("change", render);
+    sortDirection.addEventListener("change", render);
     window.addEventListener("resize", () => {
       if (dialog.open) fitInfoLinesAfterPaint();
     });
