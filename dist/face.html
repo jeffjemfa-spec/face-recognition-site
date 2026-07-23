@@ -52,6 +52,7 @@
     }
 
     input,
+    textarea,
     select,
     button {
       min-width: 0;
@@ -67,6 +68,10 @@
 
     input { padding: 0 12px; }
     select { padding: 0 8px; }
+    textarea {
+      padding: 10px 12px;
+      resize: vertical;
+    }
 
     .panel-toggle {
       flex: 0 0 76px;
@@ -351,10 +356,49 @@
     }
 
     .modal-name {
+      display: block;
+      width: 100%;
+      height: auto;
+      min-height: 38px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--ink);
       font-size: 28px;
       line-height: 1.1;
       font-weight: 850;
       overflow-wrap: anywhere;
+    }
+
+    .modal-input:focus,
+    .info-lines-input:focus {
+      outline: 2px solid rgba(11, 127, 114, .28);
+      outline-offset: 2px;
+    }
+
+    .title.modal-input {
+      display: block;
+      width: 100%;
+      height: auto;
+      min-height: 28px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+    }
+
+    .info-lines-input {
+      display: block;
+      width: 100%;
+      min-height: 72px;
+      margin-top: 7px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-size: 13px;
+      line-height: 1.35;
+      resize: vertical;
     }
 
     .close {
@@ -446,12 +490,12 @@
     <div class="modal-body">
       <div class="modal-head">
         <div>
-          <div id="modalName" class="modal-name"></div>
-          <div id="modalTitle" class="title"></div>
+          <input id="modalName" class="modal-name modal-input" type="text" autocomplete="off" aria-label="姓名">
+          <input id="modalTitle" class="title modal-input" type="text" autocomplete="off" aria-label="職稱">
         </div>
         <button class="close" id="close" type="button" aria-label="關閉">×</button>
       </div>
-      <div id="modalInfoLines"></div>
+      <textarea id="modalInfoLines" class="info-lines-input" autocomplete="off" aria-label="詳細資料"></textarea>
       <div class="notes">
         <label class="notes-label" for="modalNotes">備註</label>
         <textarea id="modalNotes" class="notes-input" rows="4" placeholder="輸入備註"></textarea>
@@ -487,9 +531,18 @@
     let showNames = true;
     let activePersonId = "";
     const notesKey = "faceCardsNotes:v1";
+    const editsKey = "faceCardsPersonEdits:v1";
     const savedNotes = (() => {
       try {
         return JSON.parse(localStorage.getItem(notesKey) || "{}");
+      } catch {
+        return {};
+      }
+    })();
+    const savedEdits = (() => {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(editsKey) || "{}");
+        return parsed && typeof parsed === "object" ? parsed : {};
       } catch {
         return {};
       }
@@ -508,6 +561,8 @@
     let cardGestureMoved = false;
     let cardLayoutFrame = 0;
     let suppressCardClickUntil = 0;
+
+    applySavedEdits();
 
     function clamp(value, min, max) {
       return Math.min(max, Math.max(min, value));
@@ -777,6 +832,38 @@
         .replaceAll('"', "&quot;");
     }
 
+    function splitLines(value) {
+      return String(value || "").split(/\n+/).map((line) => line.trim()).filter(Boolean);
+    }
+
+    function applySavedEdits() {
+      for (const person of people) {
+        const edit = savedEdits[person.id];
+        if (!edit) continue;
+        if (typeof edit.name === "string") person.name = edit.name;
+        if (typeof edit.title === "string") person.title = edit.title;
+        if (Array.isArray(edit.infoLines)) person.infoLines = edit.infoLines.filter(Boolean);
+      }
+    }
+
+    function saveActivePersonEdits() {
+      if (!activePersonId) return;
+      const person = people.find((item) => item.id === activePersonId);
+      if (!person) return;
+      person.name = modalName.value.trim() || person.id;
+      person.title = modalTitle.value.trim();
+      person.infoLines = splitLines(modalInfoLines.value);
+      savedEdits[person.id] = {
+        name: person.name,
+        title: person.title,
+        infoLines: person.infoLines,
+      };
+      localStorage.setItem(editsKey, JSON.stringify(savedEdits));
+      modalPhoto.alt = person.name;
+      if (person.infoImageData) modalInfoImage.alt = `${person.name} 資料`;
+      render();
+    }
+
     function filteredPeople() {
       const q = search.value.trim().toLowerCase();
       let rows = people.filter((person) => {
@@ -809,9 +896,9 @@
       resetPhotoZoom();
       modalPhoto.src = person.imageData;
       modalPhoto.alt = person.name;
-      modalName.textContent = person.name;
-      modalTitle.textContent = person.title || "";
-      modalInfoLines.innerHTML = (person.infoLines || []).map((line) => `<div class="info-line">${esc(line)}</div>`).join("");
+      modalName.value = person.name;
+      modalTitle.value = person.title || "";
+      modalInfoLines.value = (person.infoLines || []).join("\n");
       modalNotes.value = savedNotes[person.id] || "";
       if (person.infoImageData) {
         modalInfoImage.src = person.infoImageData;
@@ -847,6 +934,9 @@
       else delete savedNotes[activePersonId];
       localStorage.setItem(notesKey, JSON.stringify(savedNotes));
     });
+    modalName.addEventListener("input", saveActivePersonEdits);
+    modalTitle.addEventListener("input", saveActivePersonEdits);
+    modalInfoLines.addEventListener("input", saveActivePersonEdits);
     closeButton.addEventListener("click", () => dialog.close());
     dialog.addEventListener("click", (event) => {
       if (event.target === dialog) dialog.close();
