@@ -376,6 +376,17 @@
       outline-offset: 2px;
     }
 
+    .modal-input[readonly],
+    .info-lines-input[readonly] {
+      cursor: pointer;
+      -webkit-text-fill-color: currentColor;
+    }
+
+    .modal-input.is-editing,
+    .info-lines-input.is-editing {
+      cursor: text;
+    }
+
     .title.modal-input {
       display: block;
       width: 100%;
@@ -864,6 +875,26 @@
       render();
     }
 
+    function editableFields() {
+      return [modalName, modalTitle, modalInfoLines];
+    }
+
+    function lockEditFields() {
+      editableFields().forEach((field) => {
+        field.readOnly = true;
+        field.classList.remove("is-editing");
+      });
+    }
+
+    function unlockEditField(field) {
+      if (!activePersonId) return;
+      field.readOnly = false;
+      field.classList.add("is-editing");
+      field.focus({ preventScroll: true });
+      const end = field.value.length;
+      if (typeof field.setSelectionRange === "function") field.setSelectionRange(end, end);
+    }
+
     function filteredPeople() {
       const q = search.value.trim().toLowerCase();
       let rows = people.filter((person) => {
@@ -899,6 +930,7 @@
       modalName.value = person.name;
       modalTitle.value = person.title || "";
       modalInfoLines.value = (person.infoLines || []).join("\n");
+      lockEditFields();
       modalNotes.value = savedNotes[person.id] || "";
       if (person.infoImageData) {
         modalInfoImage.src = person.infoImageData;
@@ -937,6 +969,13 @@
     modalName.addEventListener("input", saveActivePersonEdits);
     modalTitle.addEventListener("input", saveActivePersonEdits);
     modalInfoLines.addEventListener("input", saveActivePersonEdits);
+    editableFields().forEach((field) => {
+      field.addEventListener("click", () => unlockEditField(field));
+      field.addEventListener("blur", () => {
+        field.readOnly = true;
+        field.classList.remove("is-editing");
+      });
+    });
     closeButton.addEventListener("click", () => dialog.close());
     dialog.addEventListener("click", (event) => {
       if (event.target === dialog) dialog.close();
