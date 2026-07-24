@@ -207,6 +207,7 @@
 
     .person.is-dragging {
       opacity: .38;
+      pointer-events: none;
       transform: scale(.98);
       box-shadow: none;
     }
@@ -1235,14 +1236,47 @@
       });
     }
 
-    function previewCardDrop(target) {
-      if (!dragState || !target || target.dataset.id === dragState.id) return;
+    function dragCenter(state) {
+      return {
+        x: state.currentX - state.offsetX + state.sourceWidth / 2,
+        y: state.currentY - state.offsetY + state.sourceHeight / 2,
+      };
+    }
+
+    function shouldMoveBefore(card, center) {
+      const rect = card.getBoundingClientRect();
+      const rowTop = rect.top - rect.height * .2;
+      const rowBottom = rect.bottom + rect.height * .2;
+      if (center.y < rect.top + rect.height * .45) return true;
+      return center.y >= rowTop && center.y <= rowBottom && center.x < rect.left + rect.width * .45;
+    }
+
+    function shouldMoveAfter(card, center) {
+      const rect = card.getBoundingClientRect();
+      const rowTop = rect.top - rect.height * .2;
+      const rowBottom = rect.bottom + rect.height * .2;
+      if (center.y > rect.top + rect.height * .55) return true;
+      return center.y >= rowTop && center.y <= rowBottom && center.x > rect.left + rect.width * .55;
+    }
+
+    function previewCardDrop() {
+      if (!dragState) return;
       const source = grid.querySelector(personSelector(dragState.id));
-      if (!source || source === target) return;
-      const cards = [...grid.querySelectorAll(".person")];
-      const sourceIndex = cards.indexOf(source);
-      const targetIndex = cards.indexOf(target);
-      const reference = targetIndex > sourceIndex ? target.nextElementSibling : target;
+      if (!source) return;
+      const center = dragCenter(dragState);
+      const previous = source.previousElementSibling?.classList.contains("person") ? source.previousElementSibling : null;
+      const next = source.nextElementSibling?.classList.contains("person") ? source.nextElementSibling : null;
+      let target = null;
+      let reference = null;
+      if (previous && shouldMoveBefore(previous, center)) {
+        target = previous;
+        reference = previous;
+      } else if (next && shouldMoveAfter(next, center)) {
+        target = next;
+        reference = next.nextElementSibling;
+      } else {
+        return;
+      }
       if (source.nextElementSibling === reference) return;
       const before = prepareGridShift();
       grid.insertBefore(source, reference);
@@ -1271,6 +1305,8 @@
       dragState.ghost = ghost.ghost;
       dragState.offsetX = ghost.offsetX;
       dragState.offsetY = ghost.offsetY;
+      dragState.sourceWidth = source.getBoundingClientRect().width;
+      dragState.sourceHeight = source.getBoundingClientRect().height;
       source.classList.add("is-dragging");
       moveDragGhost(dragState, dragState.currentX, dragState.currentY);
       if (typeof grid.setPointerCapture === "function") {
@@ -1310,8 +1346,7 @@
       if (!dragState.dragging) return;
       event.preventDefault();
       moveDragGhost(dragState, event.clientX, event.clientY);
-      const target = document.elementFromPoint(event.clientX, event.clientY)?.closest(".person");
-      previewCardDrop(target);
+      previewCardDrop();
     }
 
     function finishCardDrag(event) {
