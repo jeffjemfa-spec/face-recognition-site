@@ -808,8 +808,11 @@
     }
 
     function cardColumnsForScale(scale) {
-      if (scale >= 1) return baseCardColumns();
-      return clamp(Math.round(baseCardColumns() / scale), baseCardColumns(), 16);
+      const baseColumns = baseCardColumns();
+      if (scale >= 1) return baseColumns;
+      const shrinkStep = closestCardScale(scale);
+      const extraColumnsByStep = { 0.75: 1, 0.5: 2, 0.25: 3 };
+      return baseColumns + (extraColumnsByStep[shrinkStep] || 0);
     }
 
     function closestCardScale(scale) {
