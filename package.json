@@ -1,14 +1,22 @@
 {
   "scripts": {
     "build": "next build && mkdir -p dist/server dist/.openai && cp public/face.html dist/index.html && cp public/face.html dist/face.html && cp index.mjs dist/server/index.js && cp .openai/hosting.json dist/.openai/hosting.json",
-    "start": "next start"
+    "start": "next start",
+    "app:sync": "npm run build && cap sync",
+    "app:ios": "npm run app:sync && cap open ios",
+    "app:android": "npm run app:sync && cap open android",
+    "app:android:debug": "npm run app:sync && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
-    "next": "latest",
+    "next": "^16.2.11",
     "react": "latest",
     "react-dom": "latest"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/cli": "^8.4.2",
+    "@capacitor/core": "^8.4.2",
+    "@capacitor/ios": "^8.4.2",
     "@types/node": "26.1.1",
     "@types/react": "19.2.17",
     "typescript": "7.0.2"
