@@ -20,6 +20,10 @@
 
     * { box-sizing: border-box; }
 
+    html {
+      overscroll-behavior-y: contain;
+    }
+
     body {
       margin: 0;
       min-height: 100vh;
@@ -27,12 +31,14 @@
       color: var(--ink);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
       letter-spacing: 0;
+      overscroll-behavior-y: contain;
     }
 
     main {
       width: min(100%, 980px);
       margin: 0 auto;
       padding: max(10px, env(safe-area-inset-top)) 12px 28px;
+      overscroll-behavior-y: contain;
     }
 
     .topbar {
@@ -539,6 +545,7 @@
     <section class="topbar">
       <div class="compact-tools">
         <select id="quickCardScale" class="quick-scale" aria-label="照片縮放">
+          <option value="0.25">25%</option>
           <option value="0.5">50%</option>
           <option value="0.75">75%</option>
           <option value="1" selected>100%</option>
@@ -562,6 +569,7 @@
             <option value="desc">大到小</option>
           </select>
           <select id="cardScale" aria-label="照片縮放">
+            <option value="0.25">照片 25%</option>
             <option value="0.5">照片 50%</option>
             <option value="0.75">照片 75%</option>
             <option value="1" selected>照片 100%</option>
@@ -636,6 +644,7 @@
     let activePersonId = "";
     let lockedScrollY = 0;
     let modalTouchStartY = 0;
+    let pageTouchStartY = 0;
     let dragState = null;
     const notesKey = "faceCardsNotes:v1";
     const editsKey = "faceCardsPersonEdits:v1";
@@ -776,7 +785,7 @@
     }
 
     function constrainCardZoom(zoom) {
-      const scale = Math.abs(zoom.scale - 1) < 0.03 ? 1 : clamp(zoom.scale, 0.5, 4);
+      const scale = Math.abs(zoom.scale - 1) < 0.03 ? 1 : clamp(zoom.scale, 0.25, 4);
       if (scale === 1) return { scale: 1, x: 0, y: 0 };
       if (scale < 1) {
         return { scale, x: 0, y: 0 };
@@ -800,11 +809,11 @@
 
     function cardColumnsForScale(scale) {
       if (scale >= 1) return baseCardColumns();
-      return clamp(Math.round(baseCardColumns() / scale), baseCardColumns(), 8);
+      return clamp(Math.round(baseCardColumns() / scale), baseCardColumns(), 16);
     }
 
     function closestCardScale(scale) {
-      const allowed = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+      const allowed = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
       return allowed.reduce((best, value) => (
         Math.abs(value - scale) < Math.abs(best - scale) ? value : best
       ), 1);
@@ -831,7 +840,7 @@
     }
 
     function setCardScale(value) {
-      const scale = clamp(Number(value) || 1, 0.5, 2);
+      const scale = clamp(Number(value) || 1, 0.25, 2);
       cardPointers.clear();
       cardGesture = null;
       cardZoom = { scale, x: 0, y: 0 };
@@ -887,7 +896,7 @@
         applyCardZoom();
       } else if (cardGesture.mode === "pinch" && points.length >= 2) {
         const center = midpoint(points[0], points[1]);
-        const nextScale = clamp(cardGesture.base.scale * (distance(points[0], points[1]) / cardGesture.startDistance), 0.5, 2);
+        const nextScale = clamp(cardGesture.base.scale * (distance(points[0], points[1]) / cardGesture.startDistance), 0.25, 2);
         const ratio = nextScale / cardGesture.base.scale;
         cardGestureMoved = true;
         cardZoom = {
@@ -1175,6 +1184,25 @@
       const atTop = scrollArea.scrollTop <= 0;
       const atBottom = Math.ceil(scrollArea.scrollTop + scrollArea.clientHeight) >= scrollArea.scrollHeight;
       if ((atTop && deltaY > 0) || (atBottom && deltaY < 0)) event.preventDefault();
+    }
+
+    function handlePageTouchStart(event) {
+      if (event.touches.length === 1) pageTouchStartY = event.touches[0].clientY;
+    }
+
+    function handlePageTouchMove(event) {
+      if (dialog.open) return;
+      if (event.touches.length >= 2 && event.target.closest?.("#cardStage")) {
+        event.preventDefault();
+        return;
+      }
+      if (event.touches.length !== 1) return;
+      const deltaY = event.touches[0].clientY - pageTouchStartY;
+      const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+      const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      if ((scrollTop <= 0 && deltaY > 0) || (scrollTop >= maxScroll - 1 && deltaY < 0)) {
+        event.preventDefault();
+      }
     }
 
     function clearCardDropTargets() {
@@ -1523,6 +1551,8 @@
     dialog.addEventListener("close", unlockPageScroll);
     dialog.addEventListener("touchstart", handleDialogTouchStart, { passive: true });
     dialog.addEventListener("touchmove", handleDialogTouchMove, { passive: false });
+    document.addEventListener("touchstart", handlePageTouchStart, { passive: true });
+    document.addEventListener("touchmove", handlePageTouchMove, { passive: false });
     search.addEventListener("input", render);
     sortMode.addEventListener("change", render);
     sortDirection.addEventListener("change", render);
