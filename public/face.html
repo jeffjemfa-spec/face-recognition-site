@@ -94,14 +94,6 @@
       background: var(--accent);
     }
 
-    .panel-toggle[data-mode="reorder"] {
-      flex-basis: 108px;
-      width: 108px;
-      color: #fff;
-      border-color: var(--accent);
-      background: var(--accent);
-    }
-
     .info-panel {
       margin-top: 8px;
       padding: 10px;
@@ -132,19 +124,6 @@
       color: #fff;
       border-color: var(--accent-2);
       background: var(--accent-2);
-    }
-
-    .reorder-toggle {
-      width: 100%;
-      padding: 0 12px;
-      font-weight: 800;
-      text-align: center;
-    }
-
-    .reorder-toggle[aria-pressed="true"] {
-      color: #fff;
-      border-color: var(--accent);
-      background: var(--accent);
     }
 
     .detail-filters {
@@ -549,11 +528,6 @@
         width: 72px;
       }
 
-      .panel-toggle[data-mode="reorder"] {
-        flex-basis: 104px;
-        width: 104px;
-      }
-
       .panel-row {
         grid-template-columns: minmax(0, 1fr);
       }
@@ -597,7 +571,6 @@
             <option value="2">照片 200%</option>
           </select>
           <label class="check"><input id="showNamesInput" type="checkbox" checked> 顯示人名</label>
-          <button id="reorderToggle" class="reorder-toggle" type="button" aria-pressed="false">排序</button>
           <button id="detailToggle" class="detail-toggle" type="button" aria-expanded="false">展開詳細分類</button>
         </div>
         <section id="detailFilters" class="detail-filters" hidden></section>
@@ -646,7 +619,6 @@
     const panelToggle = document.getElementById("panelToggle");
     const infoPanel = document.getElementById("infoPanel");
     const showNamesInput = document.getElementById("showNamesInput");
-    const reorderToggle = document.getElementById("reorderToggle");
     const detailToggle = document.getElementById("detailToggle");
     const detailFilters = document.getElementById("detailFilters");
     const status = document.getElementById("status");
@@ -706,7 +678,7 @@
     let cardLayoutFrame = 0;
     let gridShiftFrame = 0;
     let suppressCardClickUntil = 0;
-    const dragHoldDelay = 180;
+    const dragHoldDelay = 2000;
 
     applySavedEdits();
 
@@ -1128,29 +1100,14 @@
       const detailText = selectedCount ? `，詳細分類 ${selectedCount} 項` : "";
       const sortText = sortMode.value === "custom" ? "自行排列" : sortMode.value === "name" ? "依名字" : "依修改日期";
       const directionText = sortDirection.value === "desc" ? "大到小" : "小到大";
-      const reorderText = reorderMode ? "，排序模式" : "";
+      const reorderText = reorderMode ? "，長按排序中" : "";
       status.textContent = `已載入 ${people.length} 筆，目前顯示 ${rows.length} 筆，${showNames ? "顯示名字" : "隱藏名字"}，${sortText}${directionText}${detailText}${reorderText}`;
       applyCardZoom();
     }
 
     function setReorderMode(enabled) {
       reorderMode = Boolean(enabled);
-      clearCardDragState();
-      cardPointers.clear();
-      cardGesture = null;
-      if (reorderMode) {
-        infoPanel.hidden = true;
-        detailFilters.hidden = true;
-        detailToggle.setAttribute("aria-expanded", "false");
-        detailToggle.textContent = "展開詳細分類";
-      }
       cardStage.classList.toggle("is-reordering", reorderMode);
-      reorderToggle.setAttribute("aria-pressed", String(reorderMode));
-      reorderToggle.textContent = reorderMode ? "完成排序" : "排序";
-      panelToggle.dataset.mode = reorderMode ? "reorder" : "";
-      panelToggle.setAttribute("aria-expanded", "false");
-      panelToggle.textContent = reorderMode ? "完成排序" : "展開";
-      render();
     }
 
     function show(person) {
@@ -1392,6 +1349,7 @@
       const source = grid.querySelector(personSelector(dragState.id));
       if (!source) return;
       dragState.dragging = true;
+      setReorderMode(true);
       cardGestureMoved = true;
       cardPointers.delete(dragState.pointerId);
       cardGesture = null;
@@ -1414,15 +1372,12 @@
     }
 
     function startCardDrag(event) {
-      if (!reorderMode) return;
       const button = event.target.closest(".person");
       if (!button || dialog.open || (event.button && event.button !== 0)) return;
       if (dragState && dragState.pointerId !== event.pointerId) {
         clearCardDragState();
         return;
       }
-      event.preventDefault();
-      event.stopPropagation();
       dragState = {
         pointerId: event.pointerId,
         id: button.dataset.id,
@@ -1437,13 +1392,16 @@
     }
 
     function moveCardDrag(event) {
-      if (!reorderMode || !dragState || dragState.pointerId !== event.pointerId) return;
+      if (!dragState || dragState.pointerId !== event.pointerId) return;
       dragState.currentX = event.clientX;
       dragState.currentY = event.clientY;
       const moved = Math.hypot(event.clientX - dragState.startX, event.clientY - dragState.startY);
-      if (!dragState.dragging && moved > 8) beginFloatingCardDrag();
-      if (!dragState.dragging) return;
+      if (!dragState.dragging) {
+        if (moved > 10) clearCardDragState();
+        return;
+      }
       event.preventDefault();
+      event.stopPropagation();
       moveDragGhost(dragState, event.clientX, event.clientY);
       previewCardDrop();
     }
@@ -1461,6 +1419,7 @@
         swapCustomOrder(state.id, state.targetId);
       }
       clearCardDragState();
+      if (didDrag) setReorderMode(false);
       if (didDrag) render();
       if (didDrag) {
         cardGestureMoved = true;
@@ -1470,21 +1429,26 @@
 
     function cancelCardDrag(event) {
       if (!dragState || dragState.pointerId !== event.pointerId) return;
+      const didDrag = dragState.dragging;
       clearCardDragState();
-      cardGestureMoved = true;
-      suppressCardClickUntil = Date.now() + 250;
+      if (didDrag) {
+        setReorderMode(false);
+        cardGestureMoved = true;
+        suppressCardClickUntil = Date.now() + 250;
+      }
     }
 
     grid.addEventListener("pointerdown", startCardDrag);
     grid.addEventListener("pointermove", moveCardDrag);
     grid.addEventListener("pointerup", finishCardDrag);
     grid.addEventListener("pointercancel", cancelCardDrag);
+    grid.addEventListener("touchmove", (event) => {
+      if (dragState?.dragging) event.preventDefault();
+    }, { passive: false });
+    grid.addEventListener("contextmenu", (event) => {
+      if (event.target.closest(".person")) event.preventDefault();
+    });
     grid.addEventListener("click", (event) => {
-      if (reorderMode) {
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-      }
       if (Date.now() < suppressCardClickUntil) {
         event.preventDefault();
         event.stopPropagation();
@@ -1540,16 +1504,11 @@
     quickCardScale.addEventListener("change", () => setCardScale(quickCardScale.value));
     cardScale.addEventListener("change", () => setCardScale(cardScale.value));
     panelToggle.addEventListener("click", () => {
-      if (reorderMode) {
-        setReorderMode(false);
-        return;
-      }
       const willOpen = infoPanel.hidden;
       infoPanel.hidden = !willOpen;
       panelToggle.setAttribute("aria-expanded", String(willOpen));
       panelToggle.textContent = willOpen ? "收合" : "展開";
       if (!willOpen) {
-        setReorderMode(false);
         detailFilters.hidden = true;
         detailToggle.setAttribute("aria-expanded", "false");
         detailToggle.textContent = "展開詳細分類";
@@ -1565,7 +1524,6 @@
       detailToggle.setAttribute("aria-expanded", String(willOpen));
       detailToggle.textContent = willOpen ? "收合詳細分類" : "展開詳細分類";
     });
-    reorderToggle.addEventListener("click", () => setReorderMode(!reorderMode));
     detailFilters.addEventListener("change", (event) => {
       if (!event.target.matches("input[type='checkbox']")) return;
       const key = event.target.dataset.filterKey;
