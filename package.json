@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "build": "next build && mkdir -p dist/server dist/.openai && cp public/face.html dist/index.html && cp public/face.html dist/face.html && cp index.mjs dist/server/index.js && cp .openai/hosting.json dist/.openai/hosting.json",
+    "build": "next build && mkdir -p dist/server dist/.openai && cp public/face.html dist/index.html && cp public/face.html dist/face.html && cp public/people.json dist/people.json && cp index.mjs dist/server/index.js && cp .openai/hosting.json dist/.openai/hosting.json",
     "start": "next start",
     "app:sync": "npm run build && cap sync",
     "app:ios": "npm run app:sync && cap open ios",
