@@ -545,14 +545,10 @@
     <section class="topbar">
       <div class="compact-tools">
         <select id="quickCardScale" class="quick-scale" aria-label="照片縮放">
-          <option value="0.25">25%</option>
-          <option value="0.5">50%</option>
-          <option value="0.75">75%</option>
           <option value="1" selected>100%</option>
-          <option value="1.25">125%</option>
-          <option value="1.5">150%</option>
-          <option value="1.75">175%</option>
-          <option value="2">200%</option>
+          <option value="0.75">75%</option>
+          <option value="0.5">50%</option>
+          <option value="0.25">25%</option>
         </select>
         <button id="panelToggle" class="panel-toggle" type="button" aria-expanded="false">展開</button>
       </div>
@@ -569,14 +565,10 @@
             <option value="desc">大到小</option>
           </select>
           <select id="cardScale" aria-label="照片縮放">
-            <option value="0.25">照片 25%</option>
-            <option value="0.5">照片 50%</option>
-            <option value="0.75">照片 75%</option>
             <option value="1" selected>照片 100%</option>
-            <option value="1.25">照片 125%</option>
-            <option value="1.5">照片 150%</option>
-            <option value="1.75">照片 175%</option>
-            <option value="2">照片 200%</option>
+            <option value="0.75">照片 75%</option>
+            <option value="0.5">照片 50%</option>
+            <option value="0.25">照片 25%</option>
           </select>
           <label class="check"><input id="showNamesInput" type="checkbox" checked> 顯示人名</label>
           <button id="detailToggle" class="detail-toggle" type="button" aria-expanded="false">展開詳細分類</button>
@@ -689,6 +681,7 @@
     let dragAutoScrollFrame = 0;
     let suppressCardClickUntil = 0;
     const dragHoldDelay = 500;
+    const cardScaleSteps = [1, 0.75, 0.5, 0.25];
 
     applySavedEdits();
 
@@ -785,7 +778,7 @@
     }
 
     function constrainCardZoom(zoom) {
-      const scale = Math.abs(zoom.scale - 1) < 0.03 ? 1 : clamp(zoom.scale, 0.25, 4);
+      const scale = closestCardScale(zoom.scale);
       if (scale === 1) return { scale: 1, x: 0, y: 0 };
       if (scale < 1) {
         return { scale, x: 0, y: 0 };
@@ -813,9 +806,9 @@
     }
 
     function closestCardScale(scale) {
-      const allowed = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
-      return allowed.reduce((best, value) => (
-        Math.abs(value - scale) < Math.abs(best - scale) ? value : best
+      const clampedScale = clamp(Number(scale) || 1, 0.25, 1);
+      return cardScaleSteps.reduce((best, value) => (
+        Math.abs(value - clampedScale) < Math.abs(best - clampedScale) ? value : best
       ), 1);
     }
 
@@ -840,7 +833,7 @@
     }
 
     function setCardScale(value) {
-      const scale = clamp(Number(value) || 1, 0.25, 2);
+      const scale = closestCardScale(value);
       cardPointers.clear();
       cardGesture = null;
       cardZoom = { scale, x: 0, y: 0 };
@@ -896,7 +889,7 @@
         applyCardZoom();
       } else if (cardGesture.mode === "pinch" && points.length >= 2) {
         const center = midpoint(points[0], points[1]);
-        const nextScale = clamp(cardGesture.base.scale * (distance(points[0], points[1]) / cardGesture.startDistance), 0.25, 2);
+        const nextScale = closestCardScale(cardGesture.base.scale * (distance(points[0], points[1]) / cardGesture.startDistance));
         const ratio = nextScale / cardGesture.base.scale;
         cardGestureMoved = true;
         cardZoom = {
