@@ -679,7 +679,7 @@
     let gridShiftFrame = 0;
     let dragAutoScrollFrame = 0;
     let suppressCardClickUntil = 0;
-    const dragHoldDelay = 2000;
+    const dragHoldDelay = 500;
 
     applySavedEdits();
 
@@ -1202,7 +1202,6 @@
       let to = nextOrder.indexOf(targetId);
       if (from === -1 || to === -1) return false;
       nextOrder.splice(from, 1);
-      if (from < to) to -= 1;
       nextOrder.splice(to, 0, dragId);
       customOrder = nextOrder;
       saveCustomOrder();
@@ -1314,19 +1313,6 @@
           button.style.transform = "";
         }
       });
-    }
-
-    function swapCustomOrder(dragId, targetId) {
-      if (!dragId || !targetId || dragId === targetId) return false;
-      normalizedCustomOrder();
-      const nextOrder = [...customOrder];
-      const from = nextOrder.indexOf(dragId);
-      const to = nextOrder.indexOf(targetId);
-      if (from === -1 || to === -1) return false;
-      [nextOrder[from], nextOrder[to]] = [nextOrder[to], nextOrder[from]];
-      customOrder = nextOrder;
-      saveCustomOrder();
-      return true;
     }
 
     function dragFocusPoint(state) {
@@ -1458,7 +1444,7 @@
         } catch {}
       }
       if (didDrag) {
-        swapCustomOrder(state.id, state.targetId);
+        reorderCustomOrder(state.id, state.targetId);
       }
       clearCardDragState();
       if (didDrag) setReorderMode(false);
