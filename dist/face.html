@@ -119,6 +119,19 @@
       background: var(--accent-2);
     }
 
+    .reorder-toggle {
+      width: 100%;
+      padding: 0 12px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .reorder-toggle[aria-pressed="true"] {
+      color: #fff;
+      border-color: var(--accent);
+      background: var(--accent);
+    }
+
     .detail-filters {
       margin-top: 10px;
     }
@@ -177,10 +190,14 @@
 
     .card-stage {
       overflow: hidden;
-      touch-action: pan-y;
+      touch-action: pan-y pinch-zoom;
     }
 
     .card-stage.is-zooming {
+      touch-action: none;
+    }
+
+    .card-stage.is-reordering {
       touch-action: none;
     }
 
@@ -198,11 +215,20 @@
       box-shadow: 0 8px 22px rgba(21, 31, 43, .08);
       text-align: left;
       cursor: pointer;
-      touch-action: none;
+      touch-action: pan-y pinch-zoom;
       user-select: none;
       -webkit-touch-callout: none;
       -webkit-user-select: none;
       transition: opacity .14s ease, transform .14s ease, box-shadow .14s ease;
+    }
+
+    .card-stage.is-reordering .person {
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .card-stage.is-reordering .person:active {
+      cursor: grabbing;
     }
 
     .person.is-dragging {
@@ -542,6 +568,7 @@
             <option value="2">照片 200%</option>
           </select>
           <label class="check"><input id="showNamesInput" type="checkbox" checked> 顯示人名</label>
+          <button id="reorderToggle" class="reorder-toggle" type="button" aria-pressed="false">排序</button>
           <button id="detailToggle" class="detail-toggle" type="button" aria-expanded="false">展開詳細分類</button>
         </div>
         <section id="detailFilters" class="detail-filters" hidden></section>
@@ -589,6 +616,7 @@
     const panelToggle = document.getElementById("panelToggle");
     const infoPanel = document.getElementById("infoPanel");
     const showNamesInput = document.getElementById("showNamesInput");
+    const reorderToggle = document.getElementById("reorderToggle");
     const detailToggle = document.getElementById("detailToggle");
     const detailFilters = document.getElementById("detailFilters");
     const status = document.getElementById("status");
@@ -602,6 +630,7 @@
     const modalInfoImage = document.getElementById("modalInfoImage");
     const closeButton = document.getElementById("close");
     let showNames = true;
+    let reorderMode = false;
     let activePersonId = "";
     let lockedScrollY = 0;
     let modalTouchStartY = 0;
@@ -1067,8 +1096,21 @@
       const detailText = selectedCount ? `，詳細分類 ${selectedCount} 項` : "";
       const sortText = sortMode.value === "custom" ? "自行排列" : sortMode.value === "name" ? "依名字" : "依修改日期";
       const directionText = sortDirection.value === "desc" ? "大到小" : "小到大";
-      status.textContent = `已載入 ${people.length} 筆，目前顯示 ${rows.length} 筆，${showNames ? "顯示名字" : "隱藏名字"}，${sortText}${directionText}${detailText}`;
+      const reorderText = reorderMode ? "，排序模式" : "";
+      status.textContent = `已載入 ${people.length} 筆，目前顯示 ${rows.length} 筆，${showNames ? "顯示名字" : "隱藏名字"}，${sortText}${directionText}${detailText}${reorderText}`;
       applyCardZoom();
+    }
+
+    function setReorderMode(enabled) {
+      reorderMode = Boolean(enabled);
+      clearCardDragState();
+      cardPointers.clear();
+      cardGesture = null;
+      if (reorderMode) resetCardZoom();
+      cardStage.classList.toggle("is-reordering", reorderMode);
+      reorderToggle.setAttribute("aria-pressed", String(reorderMode));
+      reorderToggle.textContent = reorderMode ? "完成排序" : "排序";
+      render();
     }
 
     function show(person) {
@@ -1332,12 +1374,14 @@
     }
 
     function startCardDrag(event) {
+      if (!reorderMode) return;
       const button = event.target.closest(".person");
       if (!button || dialog.open || (event.button && event.button !== 0)) return;
       if (dragState && dragState.pointerId !== event.pointerId) {
         clearCardDragState();
         return;
       }
+      event.preventDefault();
       event.stopPropagation();
       dragState = {
         pointerId: event.pointerId,
@@ -1353,7 +1397,7 @@
     }
 
     function moveCardDrag(event) {
-      if (!dragState || dragState.pointerId !== event.pointerId) return;
+      if (!reorderMode || !dragState || dragState.pointerId !== event.pointerId) return;
       dragState.currentX = event.clientX;
       dragState.currentY = event.clientY;
       const moved = Math.hypot(event.clientX - dragState.startX, event.clientY - dragState.startY);
@@ -1396,6 +1440,11 @@
     grid.addEventListener("pointerup", finishCardDrag);
     grid.addEventListener("pointercancel", cancelCardDrag);
     grid.addEventListener("click", (event) => {
+      if (reorderMode) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       if (Date.now() < suppressCardClickUntil) {
         event.preventDefault();
         event.stopPropagation();
@@ -1455,6 +1504,7 @@
       panelToggle.setAttribute("aria-expanded", String(willOpen));
       panelToggle.textContent = willOpen ? "收合" : "展開";
       if (!willOpen) {
+        setReorderMode(false);
         detailFilters.hidden = true;
         detailToggle.setAttribute("aria-expanded", "false");
         detailToggle.textContent = "展開詳細分類";
@@ -1470,6 +1520,7 @@
       detailToggle.setAttribute("aria-expanded", String(willOpen));
       detailToggle.textContent = willOpen ? "收合詳細分類" : "展開詳細分類";
     });
+    reorderToggle.addEventListener("click", () => setReorderMode(!reorderMode));
     detailFilters.addEventListener("change", (event) => {
       if (!event.target.matches("input[type='checkbox']")) return;
       const key = event.target.dataset.filterKey;
@@ -1479,7 +1530,13 @@
       render();
     });
     cardStage.addEventListener("pointerdown", (event) => {
+      if (reorderMode) return;
       cardPointers.set(event.pointerId, cardPoint(event));
+      if (cardPointers.size > 1 && cardZoom.scale <= 1) {
+        cardPointers.clear();
+        cardGesture = null;
+        return;
+      }
       if (cardPointers.size > 1) clearCardDragState();
       if (cardPointers.size > 1 || !event.target.closest(".person")) {
         cardStage.setPointerCapture(event.pointerId);
@@ -1488,21 +1545,27 @@
       startCardGesture();
     });
     cardStage.addEventListener("pointermove", (event) => {
+      if (reorderMode) return;
       if (!cardPointers.has(event.pointerId)) return;
       if (dragState?.dragging && dragState.pointerId === event.pointerId) return;
-      if (cardZoom.scale > 1 || cardPointers.size > 1) event.preventDefault();
+      if (cardZoom.scale <= 1 && cardPointers.size > 1) return;
+      if (cardZoom.scale > 1) event.preventDefault();
       cardPointers.set(event.pointerId, cardPoint(event));
       updateCardGesture();
     });
     cardStage.addEventListener("pointerup", (event) => {
+      if (reorderMode) return;
       cardPointers.delete(event.pointerId);
       startCardGesture();
     });
     cardStage.addEventListener("pointercancel", (event) => {
+      if (reorderMode) return;
       cardPointers.delete(event.pointerId);
       startCardGesture();
     });
-    cardStage.addEventListener("dblclick", resetCardZoom);
+    cardStage.addEventListener("dblclick", () => {
+      if (!reorderMode) resetCardZoom();
+    });
     window.addEventListener("resize", refreshCardLayout);
     window.addEventListener("orientationchange", () => {
       refreshCardLayout();
