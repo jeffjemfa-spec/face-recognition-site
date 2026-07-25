@@ -1236,54 +1236,69 @@
       });
     }
 
-    function dragCenter(state) {
+    function swapCustomOrder(dragId, targetId) {
+      if (!dragId || !targetId || dragId === targetId) return false;
+      normalizedCustomOrder();
+      const nextOrder = [...customOrder];
+      const from = nextOrder.indexOf(dragId);
+      const to = nextOrder.indexOf(targetId);
+      if (from === -1 || to === -1) return false;
+      [nextOrder[from], nextOrder[to]] = [nextOrder[to], nextOrder[from]];
+      customOrder = nextOrder;
+      saveCustomOrder();
+      return true;
+    }
+
+    function dragFocusPoint(state) {
       return {
         x: state.currentX - state.offsetX + state.sourceWidth / 2,
         y: state.currentY - state.offsetY + state.sourceHeight / 2,
       };
     }
 
-    function shouldMoveBefore(card, center) {
-      const rect = card.getBoundingClientRect();
-      const rowTop = rect.top - rect.height * .2;
-      const rowBottom = rect.bottom + rect.height * .2;
-      if (center.y < rect.top + rect.height * .45) return true;
-      return center.y >= rowTop && center.y <= rowBottom && center.x < rect.left + rect.width * .45;
+    function pointInDropZone(point, rect) {
+      const margin = Math.max(24, Math.min(rect.width, rect.height) * .18);
+      return (
+        point.x >= rect.left - margin &&
+        point.x <= rect.right + margin &&
+        point.y >= rect.top - margin &&
+        point.y <= rect.bottom + margin
+      );
     }
 
-    function shouldMoveAfter(card, center) {
-      const rect = card.getBoundingClientRect();
-      const rowTop = rect.top - rect.height * .2;
-      const rowBottom = rect.bottom + rect.height * .2;
-      if (center.y > rect.top + rect.height * .55) return true;
-      return center.y >= rowTop && center.y <= rowBottom && center.x > rect.left + rect.width * .55;
+    function dragTargetFromPoint(state) {
+      const point = dragFocusPoint(state);
+      const currentTarget = state.targetId && state.targetId !== state.id
+        ? grid.querySelector(personSelector(state.targetId))
+        : null;
+      if (currentTarget && pointInDropZone(point, currentTarget.getBoundingClientRect())) {
+        return currentTarget;
+      }
+      let bestTarget = null;
+      let bestDistance = Infinity;
+      for (const target of grid.querySelectorAll(".person:not(.is-dragging)")) {
+        if (target.dataset.id === state.id) continue;
+        const rect = target.getBoundingClientRect();
+        if (!pointInDropZone(point, rect)) continue;
+        const dx = point.x - (rect.left + rect.width / 2);
+        const dy = point.y - (rect.top + rect.height / 2);
+        const distance = dx * dx + dy * dy;
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestTarget = target;
+        }
+      }
+      return bestTarget;
     }
 
     function previewCardDrop() {
       if (!dragState) return;
-      const source = grid.querySelector(personSelector(dragState.id));
-      if (!source) return;
-      const center = dragCenter(dragState);
-      const previous = source.previousElementSibling?.classList.contains("person") ? source.previousElementSibling : null;
-      const next = source.nextElementSibling?.classList.contains("person") ? source.nextElementSibling : null;
-      let target = null;
-      let reference = null;
-      if (previous && shouldMoveBefore(previous, center)) {
-        target = previous;
-        reference = previous;
-      } else if (next && shouldMoveAfter(next, center)) {
-        target = next;
-        reference = next.nextElementSibling;
-      } else {
-        return;
-      }
-      if (source.nextElementSibling === reference) return;
-      const before = prepareGridShift();
-      grid.insertBefore(source, reference);
-      dragState.targetId = target.dataset.id;
+      const target = dragTargetFromPoint(dragState);
+      const nextTargetId = target?.dataset.id || dragState.id;
+      if (dragState.targetId === nextTargetId) return;
+      dragState.targetId = nextTargetId;
       clearCardDropTargets();
-      target.classList.add("is-drop-target");
-      animateGridShift(before);
+      if (target) target.classList.add("is-drop-target");
     }
 
     function beginFloatingCardDrag() {
@@ -1359,8 +1374,7 @@
         } catch {}
       }
       if (didDrag) {
-        customOrder = gridOrderFromDom();
-        saveCustomOrder();
+        swapCustomOrder(state.id, state.targetId);
       }
       clearCardDragState();
       if (didDrag) render();
