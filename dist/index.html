@@ -1146,8 +1146,7 @@
       });
     }
 
-    function downloadPeopleJson() {
-      const blob = new Blob([JSON.stringify(exportPeopleData())], { type: "application/json" });
+    function triggerPeopleJsonDownload(blob) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -1155,7 +1154,27 @@
       document.body.append(link);
       link.click();
       link.remove();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    async function downloadPeopleJson() {
+      const blob = new Blob([JSON.stringify(exportPeopleData())], { type: "application/json" });
+      const file = typeof File === "function"
+        ? new File([blob], "people.json", { type: "application/json" })
+        : null;
+      if (file && navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: "people.json",
+          });
+          status.textContent = `已匯出 people.json，共 ${people.length} 筆`;
+          return;
+        } catch (error) {
+          if (error?.name === "AbortError") return;
+        }
+      }
+      triggerPeopleJsonDownload(blob);
       status.textContent = `已匯出 people.json，共 ${people.length} 筆`;
     }
 
