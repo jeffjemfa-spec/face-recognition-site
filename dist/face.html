@@ -132,6 +132,13 @@
       background: var(--accent-2);
     }
 
+    .export-button {
+      width: 100%;
+      padding: 0 12px;
+      font-weight: 800;
+      text-align: center;
+    }
+
     .detail-filters {
       margin-top: 10px;
     }
@@ -572,6 +579,7 @@
           </select>
           <label class="check"><input id="showNamesInput" type="checkbox" checked> 顯示人名</label>
           <button id="detailToggle" class="detail-toggle" type="button" aria-expanded="false">展開詳細分類</button>
+          <button id="exportData" class="export-button" type="button">匯出 people.json</button>
         </div>
         <section id="detailFilters" class="detail-filters" hidden></section>
         <div id="status" class="status"></div>
@@ -623,6 +631,7 @@
     const showNamesInput = document.getElementById("showNamesInput");
     const detailToggle = document.getElementById("detailToggle");
     const detailFilters = document.getElementById("detailFilters");
+    const exportData = document.getElementById("exportData");
     const status = document.getElementById("status");
     const dialog = document.getElementById("dialog");
     const photoStage = document.getElementById("photoStage");
@@ -929,6 +938,7 @@
         ...(person.detailCategories || []),
         ...(person.clubs || []),
         ...(person.infoLines || []),
+        person.notes || "",
         savedNotes[person.id] || "",
       ].join(" ").toLowerCase();
     }
@@ -983,6 +993,9 @@
 
     function applySavedEdits() {
       for (const person of people) {
+        if (typeof person.notes === "string" && savedNotes[person.id] === undefined) {
+          savedNotes[person.id] = person.notes;
+        }
         const edit = savedEdits[person.id];
         if (!edit) continue;
         if (typeof edit.name === "string") person.name = edit.name;
@@ -1111,6 +1124,39 @@
         return matchesText && matchesDetails;
       });
       return sortRows(rows);
+    }
+
+    function exportPeopleData() {
+      const orderedIds = normalizedCustomOrder();
+      const byId = new Map(people.map((person) => [person.id, person]));
+      return orderedIds.map((id, index) => {
+        const person = byId.get(id);
+        const exported = { ...person };
+        const edit = savedEdits[id];
+        if (edit) {
+          if (typeof edit.name === "string") exported.name = edit.name;
+          if (typeof edit.title === "string") exported.title = edit.title;
+          if (Array.isArray(edit.infoLines)) exported.infoLines = edit.infoLines.filter(Boolean);
+        }
+        const note = savedNotes[id] ?? exported.notes;
+        if (typeof note === "string" && note.trim()) exported.notes = note.trim();
+        else delete exported.notes;
+        exported.inputOrder = index + 1;
+        return exported;
+      });
+    }
+
+    function downloadPeopleJson() {
+      const blob = new Blob([JSON.stringify(exportPeopleData())], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "people.json";
+      document.body.append(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      status.textContent = `已匯出 people.json，共 ${people.length} 筆`;
     }
 
     function render() {
@@ -1537,6 +1583,11 @@
       if (value) savedNotes[activePersonId] = value;
       else delete savedNotes[activePersonId];
       localStorage.setItem(notesKey, JSON.stringify(savedNotes));
+      const person = people.find((item) => item.id === activePersonId);
+      if (person) {
+        if (value) person.notes = value;
+        else delete person.notes;
+      }
     });
     modalName.addEventListener("input", saveActivePersonEdits);
     modalTitle.addEventListener("input", () => {
@@ -1593,6 +1644,7 @@
       detailToggle.setAttribute("aria-expanded", String(willOpen));
       detailToggle.textContent = willOpen ? "收合詳細分類" : "展開詳細分類";
     });
+    exportData.addEventListener("click", downloadPeopleJson);
     detailFilters.addEventListener("change", (event) => {
       if (!event.target.matches("input[type='checkbox']")) return;
       const key = event.target.dataset.filterKey;
