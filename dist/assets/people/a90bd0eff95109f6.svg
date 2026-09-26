@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="720" viewBox="0 0 720 720">
+  <rect width="720" height="720" fill="#f4f7f2"/>
+  <rect x="52" y="52" width="616" height="616" rx="42" fill="#fff" stroke="#d9e2d4" stroke-width="8"/>
+  <circle cx="360" cy="210" r="88" fill="#f0c27b"/>
+  <path d="M254 212c44-116 176-116 220 0-40-24-180-24-220 0z" fill="#345c46"/>
+  <text x="360" y="360" text-anchor="middle" font-family="PingFang TC, Noto Sans TC, sans-serif" font-size="74" font-weight="800" fill="#17202a">阿珠</text>
+  <text x="360" y="440" text-anchor="middle" font-family="PingFang TC, Noto Sans TC, sans-serif" font-size="38" font-weight="700" fill="#0b7f72">復興區・枕頭山小吃</text>
+  <text x="360" y="505" text-anchor="middle" font-family="PingFang TC, Noto Sans TC, sans-serif" font-size="30" fill="#647282">水蜜桃・山產野味・土雞</text>
+  <text x="360" y="558" text-anchor="middle" font-family="PingFang TC, Noto Sans TC, sans-serif" font-size="28" fill="#647282">0928-915-619</text>
+</svg>
