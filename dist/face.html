@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes, viewport-fit=cover">
+  <meta name="theme-color" content="#0b7f72">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="assets/people/a90bd0eff95109f6.svg">
   <title>照片瀏覽</title>
   <style>
     :root {
@@ -964,10 +967,13 @@
       }).join("");
     }
 
-    function card(person) {
+    function card(person, index) {
+      const imageSrc = person.thumbnailData || person.imageData;
+      const loading = index < 8 ? "eager" : "lazy";
+      const fetchPriority = index < 4 ? "high" : "auto";
       return `
         <button class="person" type="button" data-id="${esc(person.id)}" aria-label="${esc(person.name)}，可拖曳調整順序">
-          <img class="photo" src="${person.imageData}" alt="${esc(person.name)}">
+          <img class="photo" src="${esc(imageSrc)}" data-full-src="${esc(person.imageData)}" alt="${esc(person.name)}" loading="${loading}" decoding="async" fetchpriority="${fetchPriority}">
           ${showNames ? `<div class="meta">
             <div class="name">${esc(person.name)}</div>
           </div>` : ""}
@@ -1739,7 +1745,7 @@
     async function loadPeople() {
       status.textContent = "資料載入中...";
       try {
-        const response = await fetch(peopleDataUrl, { cache: "no-store" });
+        const response = await fetch(peopleDataUrl, { cache: "default" });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         if (!Array.isArray(data)) throw new Error("people data is not an array");
@@ -1754,6 +1760,14 @@
         empty.style.display = "block";
         status.textContent = "資料載入失敗";
       }
+    }
+
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register(`sw.js?v=${encodeURIComponent(dataVersion)}`).catch((error) => {
+          console.warn("Service worker registration failed", error);
+        });
+      });
     }
 
     loadPeople();
