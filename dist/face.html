@@ -681,11 +681,14 @@
     })();
     let customOrder = (() => {
       const parsed = storage.getJSON(orderKey, []);
-      return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : [];
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return [];
+      if (parsed.version !== dataVersion || !Array.isArray(parsed.order)) return [];
+      return parsed.order.filter((id) => typeof id === "string");
     })();
     const savedSortState = (() => {
       const parsed = storage.getJSON(sortStateKey, {});
-      return parsed && typeof parsed === "object" ? parsed : {};
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+      return parsed.version === dataVersion ? parsed : {};
     })();
     const filterGroups = [
       { key: "detailCategories", label: "類別", values: ["EMBA", "113", "114", "扶輪社"] },
@@ -1093,12 +1096,16 @@
     function saveCustomOrder() {
       if (!people.length) return;
       customOrder = normalizedCustomOrder();
-      storage.setJSON(orderKey, customOrder);
+      storage.setJSON(orderKey, {
+        version: dataVersion,
+        order: customOrder,
+      });
       saveSortState();
     }
 
     function saveSortState() {
       storage.setJSON(sortStateKey, {
+        version: dataVersion,
         mode: sortMode.value,
         direction: sortDirection.value,
       });
