@@ -618,7 +618,8 @@
 
   <script>
     let people = [];
-    const dataVersion = new URLSearchParams(window.location.search).get("v") || "local";
+    const builtInDataVersion = "20260928-people-f5beee97";
+    const dataVersion = new URLSearchParams(window.location.search).get("v") || builtInDataVersion;
     const peopleDataUrl = `people.json?v=${encodeURIComponent(dataVersion)}`;
 
     const grid = document.getElementById("grid");
