@@ -618,9 +618,11 @@
 
   <script>
     let people = [];
+    const urlParams = new URLSearchParams(window.location.search);
     const builtInDataVersion = "20260928-people-f5beee97";
     const dataVersion = builtInDataVersion;
     const peopleDataUrl = `people.json?v=${encodeURIComponent(dataVersion)}`;
+    const resetStoredOrder = urlParams.get("resetOrder") === "1" || urlParams.get("resetOrder") === dataVersion;
 
     const grid = document.getElementById("grid");
     const empty = document.getElementById("empty");
@@ -671,7 +673,16 @@
           localStorage.setItem(key, JSON.stringify(value));
         } catch {}
       },
+      remove(key) {
+        try {
+          localStorage.removeItem(key);
+        } catch {}
+      },
     };
+    if (resetStoredOrder) {
+      storage.remove(orderKey);
+      storage.remove(sortStateKey);
+    }
     const savedNotes = (() => {
       const parsed = storage.getJSON(notesKey, {});
       return parsed && typeof parsed === "object" ? parsed : {};
