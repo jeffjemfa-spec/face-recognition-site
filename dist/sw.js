@@ -1,4 +1,4 @@
-const CACHE_NAME = "face-cards-v20260928-people-09f00cb4-sync1";
+const CACHE_NAME = "face-cards-v20260928-people-df02f888-sync1";
 const CORE_ASSETS = [
   "./face.html",
   "./people.json",
