@@ -655,28 +655,37 @@
     const notesKey = "faceCardsNotes:v1";
     const editsKey = "faceCardsPersonEdits:v1";
     const orderKey = "faceCardsCustomOrder:v1";
+    const sortStateKey = "faceCardsSortState:v1";
+    const storage = {
+      getJSON(key, fallback) {
+        try {
+          const value = localStorage.getItem(key);
+          return value ? JSON.parse(value) : fallback;
+        } catch {
+          return fallback;
+        }
+      },
+      setJSON(key, value) {
+        try {
+          localStorage.setItem(key, JSON.stringify(value));
+        } catch {}
+      },
+    };
     const savedNotes = (() => {
-      try {
-        return JSON.parse(localStorage.getItem(notesKey) || "{}");
-      } catch {
-        return {};
-      }
+      const parsed = storage.getJSON(notesKey, {});
+      return parsed && typeof parsed === "object" ? parsed : {};
     })();
     const savedEdits = (() => {
-      try {
-        const parsed = JSON.parse(localStorage.getItem(editsKey) || "{}");
-        return parsed && typeof parsed === "object" ? parsed : {};
-      } catch {
-        return {};
-      }
+      const parsed = storage.getJSON(editsKey, {});
+      return parsed && typeof parsed === "object" ? parsed : {};
     })();
     let customOrder = (() => {
-      try {
-        const parsed = JSON.parse(localStorage.getItem(orderKey) || "[]");
-        return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : [];
-      } catch {
-        return [];
-      }
+      const parsed = storage.getJSON(orderKey, []);
+      return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : [];
+    })();
+    const savedSortState = (() => {
+      const parsed = storage.getJSON(sortStateKey, {});
+      return parsed && typeof parsed === "object" ? parsed : {};
     })();
     const filterGroups = [
       { key: "detailCategories", label: "類別", values: ["EMBA", "113", "114", "扶輪社"] },
@@ -1023,7 +1032,7 @@
         infoLines: person.infoLines,
         modifiedAt: Date.now(),
       };
-      localStorage.setItem(editsKey, JSON.stringify(savedEdits));
+      storage.setJSON(editsKey, savedEdits);
       modalPhoto.alt = person.name;
       if (person.infoImageData) modalInfoImage.alt = `${person.name} 資料`;
       render();
@@ -1078,13 +1087,36 @@
       for (const person of [...people].sort((a, b) => (a.inputOrder || 0) - (b.inputOrder || 0))) {
         if (!ordered.includes(person.id)) ordered.push(person.id);
       }
-      customOrder = ordered;
       return ordered;
     }
 
     function saveCustomOrder() {
-      normalizedCustomOrder();
-      localStorage.setItem(orderKey, JSON.stringify(customOrder));
+      if (!people.length) return;
+      customOrder = normalizedCustomOrder();
+      storage.setJSON(orderKey, customOrder);
+      saveSortState();
+    }
+
+    function saveSortState() {
+      storage.setJSON(sortStateKey, {
+        mode: sortMode.value,
+        direction: sortDirection.value,
+      });
+    }
+
+    function restoreSortState() {
+      if (customOrder.length) {
+        sortMode.value = "custom";
+        sortDirection.value = "asc";
+        saveSortState();
+        return;
+      }
+      if (savedSortState.mode && [...sortMode.options].some((option) => option.value === savedSortState.mode)) {
+        sortMode.value = savedSortState.mode;
+      }
+      if (savedSortState.direction && [...sortDirection.options].some((option) => option.value === savedSortState.direction)) {
+        sortDirection.value = savedSortState.direction;
+      }
     }
 
     function customOrderIndex(person) {
@@ -1115,6 +1147,8 @@
 
     function captureCurrentOrderAsCustom() {
       customOrder = sortRows([...people]).map((person) => person.id);
+      sortMode.value = "custom";
+      sortDirection.value = "asc";
       saveCustomOrder();
     }
 
@@ -1314,6 +1348,8 @@
       nextOrder.splice(from, 1);
       nextOrder.splice(to, 0, dragId);
       customOrder = nextOrder;
+      sortMode.value = "custom";
+      sortDirection.value = "asc";
       saveCustomOrder();
       return true;
     }
@@ -1607,7 +1643,7 @@
       const value = modalNotes.value.trim();
       if (value) savedNotes[activePersonId] = value;
       else delete savedNotes[activePersonId];
-      localStorage.setItem(notesKey, JSON.stringify(savedNotes));
+      storage.setJSON(notesKey, savedNotes);
       const person = people.find((item) => item.id === activePersonId);
       if (person) {
         if (value) person.notes = value;
@@ -1641,8 +1677,24 @@
     document.addEventListener("touchstart", handlePageTouchStart, { passive: true });
     document.addEventListener("touchmove", handlePageTouchMove, { passive: false });
     search.addEventListener("input", render);
-    sortMode.addEventListener("change", render);
-    sortDirection.addEventListener("change", render);
+    sortMode.addEventListener("change", () => {
+      saveSortState();
+      render();
+    });
+    sortDirection.addEventListener("change", () => {
+      saveSortState();
+      render();
+    });
+    window.addEventListener("pagehide", () => {
+      if (customOrder.length) saveCustomOrder();
+      else saveSortState();
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        if (customOrder.length) saveCustomOrder();
+        else saveSortState();
+      }
+    });
     window.addEventListener("resize", () => {
       if (dialog.open) fitInfoLinesAfterPaint();
     });
@@ -1750,6 +1802,7 @@
         const data = await response.json();
         if (!Array.isArray(data)) throw new Error("people data is not an array");
         people = data;
+        restoreSortState();
         applySavedEdits();
         renderDetailFilters();
         render();
