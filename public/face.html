@@ -679,10 +679,9 @@
         } catch {}
       },
     };
-    if (resetStoredOrder) {
-      storage.remove(orderKey);
-      storage.remove(sortStateKey);
-    }
+    // Always prefer the published people.json order across devices.
+    storage.remove(orderKey);
+    storage.remove(sortStateKey);
     const savedNotes = (() => {
       const parsed = storage.getJSON(notesKey, {});
       return parsed && typeof parsed === "object" ? parsed : {};
@@ -691,17 +690,7 @@
       const parsed = storage.getJSON(editsKey, {});
       return parsed && typeof parsed === "object" ? parsed : {};
     })();
-    let customOrder = (() => {
-      const parsed = storage.getJSON(orderKey, []);
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return [];
-      if (parsed.version !== dataVersion || !Array.isArray(parsed.order)) return [];
-      return parsed.order.filter((id) => typeof id === "string");
-    })();
-    const savedSortState = (() => {
-      const parsed = storage.getJSON(sortStateKey, {});
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-      return parsed.version === dataVersion ? parsed : {};
-    })();
+    let customOrder = [];
     const filterGroups = [
       { key: "detailCategories", label: "類別", values: ["EMBA", "113", "114", "扶輪社"] },
     ];
@@ -1108,34 +1097,18 @@
     function saveCustomOrder() {
       if (!people.length) return;
       customOrder = normalizedCustomOrder();
-      storage.setJSON(orderKey, {
-        version: dataVersion,
-        order: customOrder,
-      });
       saveSortState();
     }
 
     function saveSortState() {
-      storage.setJSON(sortStateKey, {
-        version: dataVersion,
-        mode: sortMode.value,
-        direction: sortDirection.value,
-      });
+      storage.remove(orderKey);
+      storage.remove(sortStateKey);
     }
 
     function restoreSortState() {
-      if (customOrder.length) {
-        sortMode.value = "custom";
-        sortDirection.value = "asc";
-        saveSortState();
-        return;
-      }
-      if (savedSortState.mode && [...sortMode.options].some((option) => option.value === savedSortState.mode)) {
-        sortMode.value = savedSortState.mode;
-      }
-      if (savedSortState.direction && [...sortDirection.options].some((option) => option.value === savedSortState.direction)) {
-        sortDirection.value = savedSortState.direction;
-      }
+      sortMode.value = "custom";
+      sortDirection.value = "asc";
+      saveSortState();
     }
 
     function customOrderIndex(person) {
